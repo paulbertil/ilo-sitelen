@@ -3,8 +3,38 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>ilo sitelen</title>
-<meta name="description" content="Type toki pona, get a sitelen pona image you can paste into any chat.">
+<title>ilo sitelen: sitelen pona generator, toki pona text to image</title>
+<meta name="description" content="Type toki pona, get a sitelen pona image to paste into WhatsApp, Discord or any chat. A free sitelen pona generator for your phone, no font to install.">
+<link rel="canonical" href="https://ilositelen.app/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="ilo sitelen">
+<meta property="og:url" content="https://ilositelen.app/">
+<meta property="og:title" content="ilo sitelen: sitelen pona generator">
+<meta property="og:description" content="Type toki pona, get a sitelen pona image to paste into WhatsApp, Discord or any chat. A free sitelen pona generator for your phone, no font to install.">
+<meta property="og:image" content="https://ilositelen.app/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:alt" content="toki! mi jan Ali. sina pona ala pona? written in sitelen pona, with the ilo sitelen mark">
+<meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  "name": "ilo sitelen",
+  "alternateName": "ilo sitelen: sitelen pona generator",
+  "url": "https://ilositelen.app/",
+  "description": "Type toki pona, get a sitelen pona image to paste into WhatsApp, Discord or any chat. A free sitelen pona generator for your phone, no font to install.",
+  "image": "https://ilositelen.app/og.png",
+  "applicationCategory": "UtilitiesApplication",
+  "operatingSystem": "Any",
+  "browserRequirements": "Requires JavaScript",
+  "inLanguage": "en",
+  "isAccessibleForFree": true,
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+  "author": { "@type": "Person", "name": "jan Pewi" }
+}
+</script>
 <meta name="theme-color" content="#f3f6f5" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0e1413" media="(prefers-color-scheme: dark)">
 <script>
@@ -102,9 +132,9 @@ body {
   font-family: "NasinNanpa"; font-size: 22px; line-height: 1;
   flex: none;
 }
-h1 { margin: 0; font: 600 1.2rem/1 var(--font-display); letter-spacing: 0.01em; white-space: nowrap; }
+.wordmark { margin: 0; font: 600 1.2rem/1 var(--font-display); letter-spacing: 0.01em; white-space: nowrap; }
 .sub { margin: 2px 0 0; color: var(--muted); font-size: 0.9rem; }
-.tagline { margin: 0; color: var(--muted); font-size: 0.95rem; }
+.tagline { margin: 0; color: var(--muted); font: inherit; font-size: 0.95rem; }
 
 label.lbl {
   display: block; font-size: 0.75rem; font-weight: 700;
@@ -206,6 +236,8 @@ button:active, .btn:active { transform: scale(0.98); }
 details { color: var(--muted); font-size: 0.9rem; }
 summary { cursor: pointer; font-weight: 600; color: var(--fg); padding: 4px 0; }
 details ul { margin: 8px 0 0; padding-left: 20px; display: grid; gap: 4px; }
+details p { margin: 8px 0 0; }
+summary h2 { display: inline; margin: 0; font: inherit; }
 code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 0.85em; background: var(--surface); border: 1px solid var(--line); border-radius: 5px; padding: 0 4px; }
 footer { color: var(--muted); font-size: 0.8rem; text-align: center; }
 footer a { color: inherit; }
@@ -280,7 +312,7 @@ body.shelf-open .shelf { transform: none; visibility: visible; transition: trans
 <body>
 <nav class="topbar" aria-label="ilo sitelen">
   <button type="button" class="icon-btn" id="recents-btn" aria-label="Show recents" title="Recents" aria-expanded="false" aria-controls="shelf"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9.5 4v16"/></svg></button>
-  <div class="brand"><div class="mark" aria-hidden="true">ilo</div><h1>ilo sitelen</h1></div>
+  <div class="brand"><div class="mark" aria-hidden="true">ilo</div><div class="wordmark">ilo sitelen</div></div>
   <button type="button" class="icon-btn theme-btn" id="theme-btn" aria-label="Switch to dark mode" title="Dark mode"><svg class="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg><svg class="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.5 1.5M17.2 17.2l1.5 1.5M5.3 18.7l1.5-1.5M17.2 6.8l1.5-1.5"/></svg></button>
 </nav>
 <main class="wrap">
@@ -295,7 +327,7 @@ body.shelf-open .shelf { transform: none; visibility: visible; transition: trans
       <button type="button" class="install-close" id="install-close" aria-label="Dismiss">&times;</button>
     </div>
   </aside>
-  <p class="tagline">Type toki pona, send it as sitelen pona.</p>
+  <h1 class="tagline">Type toki pona, get a sitelen pona image for any chat.</h1>
 
   <section>
     <label class="lbl" for="text">Your message</label>
@@ -352,6 +384,11 @@ body.shelf-open .shelf { transform: none; visibility: visible; transition: trans
       <li>Add <code>1</code> after a word for its alternate glyph: <code>mute1</code>, <code>sewi1</code></li>
       <li>Each sentence ending in <code>.</code>, <code>!</code> or <code>?</code> starts a new line in the image. Turn that off under Lines, or start a new line in the text yourself.</li>
     </ul>
+  </details>
+
+  <details>
+    <summary><h2>How do I write sitelen pona on my phone?</h2></summary>
+    <p>Type toki pona in the box above. ilo sitelen draws it in sitelen pona and gives you an image to paste into WhatsApp, Discord, Telegram or any chat. There is no font or keyboard to install, and it works offline once added to your home screen. It converts toki pona to sitelen pona, it does not translate: you write the toki pona, it draws the glyphs from the nasin nanpa font.</p>
   </details>
 
   <footer>Glyphs from <a href="https://github.com/ETBCOR/nasin-nanpa" target="_blank" rel="noopener">nasin nanpa</a> by jan Itan (MIT license).</footer>

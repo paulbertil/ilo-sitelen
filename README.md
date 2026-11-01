@@ -1,6 +1,6 @@
 # ilo sitelen
 
-Type toki pona in Latin letters, get a sitelen pona image you can paste into WhatsApp or any other chat.
+Type toki pona, get a sitelen pona image to paste into WhatsApp, Discord or any chat. A free sitelen pona generator for your phone, no font to install.
 
 A small installable web app (PWA). No build step, no backend: everything happens in the browser.
 
