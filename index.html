@@ -30,6 +30,7 @@
   --font-display: "Fredoka", "Avenir Next Rounded", ui-rounded, system-ui, sans-serif;
   --font-body: "Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", sans-serif;
   --radius: 14px;
+  --shelf-w: 340px;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
@@ -163,16 +164,60 @@ code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 0.85em
 footer { color: var(--muted); font-size: 0.8rem; text-align: center; }
 footer a { color: inherit; }
 
+/* ---- Recents shelf: what you sent, as you sent it. Slides over on a phone, a column beside the app on a wide screen. ---- */
+.icon-btn { padding: 9px; border-radius: 10px; border-color: transparent; background: transparent; color: var(--muted); }
+.icon-btn:hover { background: color-mix(in srgb, var(--fg) 6%, transparent); color: var(--fg); }
+.icon-btn svg { width: 20px; height: 20px; }
+#recents-btn { margin-left: auto; }
+body.shelf-open #recents-btn { visibility: hidden; }
+.scrim { position: fixed; inset: 0; background: rgb(0 0 0 / 0.38); z-index: 25; }
+.shelf {
+  position: fixed; top: 0; bottom: 0; right: 0; width: min(var(--shelf-w), 92vw);
+  background: var(--bg); border-left: 1.5px solid var(--line);
+  display: flex; flex-direction: column; z-index: 30;
+  padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+  transform: translateX(104%); visibility: hidden;
+  transition: transform .22s ease, visibility 0s .22s;
+}
+body.shelf-open .shelf { transform: none; visibility: visible; transition: transform .22s ease; }
+.s-top { display: flex; align-items: center; gap: 8px; padding: 14px 12px 6px 16px; }
+.s-top > div { flex: 1; min-width: 0; }
+.s-top h2 { margin: 0; font: 600 1.15rem/1 var(--font-display); }
+.s-new { padding: 8px 12px; font-size: 0.85rem; flex: none; }
+.s-new svg { width: 1em; height: 1em; }
+.s-list { flex: 1; overflow-y: auto; padding: 0 12px 16px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; align-content: start; }
+.s-day { display: flex; align-items: center; gap: 10px; font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); padding: 12px 2px 2px; }
+.s-day::after { content: ""; flex: 1; height: 1.5px; background: var(--line); }
+.s-empty { color: var(--muted); font-size: 0.9rem; padding: 18px 4px; margin: 0; }
+.card { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; padding: 10px; border-radius: 12px; border: 1.5px solid transparent; background: var(--surface); min-width: 0; }
+.card.active { border-color: var(--accent); }
+.card-img { display: flex; width: 100%; min-width: 0; justify-content: flex-start; border: 0; background: transparent; padding: 0; border-radius: 8px; }
+.card-img img { display: block; max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 1px 2px rgb(0 0 0 / 0.12), 0 4px 12px rgb(0 0 0 / 0.08); }
+.card-meta { display: flex; align-items: center; gap: 8px; font-size: 0.84rem; color: var(--muted); }
+.card-text { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--fg); }
+.card-time { flex: none; font-variant-numeric: tabular-nums; }
+.card-copy { padding: 7px; border-radius: 8px; border-color: transparent; background: transparent; color: var(--muted); flex: none; }
+.card-copy:hover { background: color-mix(in srgb, var(--fg) 6%, transparent); color: var(--accent); }
+.card-copy svg { width: 17px; height: 17px; }
+.s-foot { margin: 0; border-top: 1.5px solid var(--line); padding: 10px 16px; font-size: 0.78rem; color: var(--muted); }
+@media (min-width: 960px) {
+  body { transition: padding-right .22s ease; }
+  body.shelf-open { padding-right: var(--shelf-w); }
+  body.shelf-open .scrim { display: none; }
+  body.shelf-open .toast { left: calc(50% - var(--shelf-w) / 2); }
+}
+
 .toast {
   position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px));
   transform: translateX(-50%) translateY(20px); opacity: 0;
   background: var(--fg); color: var(--bg);
   padding: 11px 18px; border-radius: 999px; font-size: 0.92rem; font-weight: 600;
   max-width: calc(100% - 32px); text-align: center;
-  transition: opacity .2s, transform .2s; pointer-events: none; z-index: 20;
+  transition: opacity .2s, transform .2s; pointer-events: none; z-index: 40;
 }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
-@media (prefers-reduced-motion: reduce) { .toast { transition: none; } button:active { transform: none; } }
+@media (prefers-reduced-motion: reduce) { .toast, .shelf, body { transition: none; } button:active { transform: none; } }
 </style>
 </head>
 <body>
@@ -194,6 +239,7 @@ footer a { color: inherit; }
       <h1>ilo sitelen</h1>
       <p class="sub">Type toki pona, send it as sitelen pona.</p>
     </div>
+    <button type="button" class="icon-btn" id="recents-btn" aria-label="Show recents" title="Recents" aria-expanded="false" aria-controls="shelf"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M14.5 4v16"/></svg></button>
   </header>
 
   <section>
@@ -251,6 +297,17 @@ footer a { color: inherit; }
 
   <footer>Glyphs from <a href="https://github.com/ETBCOR/nasin-nanpa" target="_blank" rel="noopener">nasin nanpa</a> by jan Itan (MIT license).</footer>
 </main>
+
+<aside class="shelf" id="shelf" aria-label="Recents">
+  <div class="s-top">
+    <div><h2>Recents</h2><p class="sub">What you sent, as you sent it.</p></div>
+    <button type="button" class="s-new" id="s-new"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>New</button>
+    <button type="button" class="icon-btn" id="s-close" aria-label="Hide recents" title="Hide recents"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M14.5 4v16"/></svg></button>
+  </div>
+  <div class="s-list" id="s-list"></div>
+  <p class="s-foot" id="s-foot">Saved on this device only.</p>
+</aside>
+<div class="scrim" id="scrim" hidden></div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script>window.__IS_ARTIFACT__ = false;
@@ -279,6 +336,7 @@ footer a { color: inherit; }
   const $ = (id) => document.getElementById(id);
   const textEl = $("text"), outEl = $("out"), unknownEl = $("unknown"), toastEl = $("toast");
   const copyBtn = $("copy"), shareBtn = $("share"), saveLink = $("save");
+  const recentsBtn = $("recents-btn"), shelfList = $("s-list"), scrimEl = $("scrim");
 
   const store = {
     get(k, d) { try { const v = localStorage.getItem("ilo-sitelen:" + k); return v == null ? d : v; } catch { return d; } },
@@ -312,7 +370,7 @@ footer a { color: inherit; }
     return glyphs.length ? "[" + glyphs.join("") + "]" : null;
   }
 
-  function parseLine(line, unknown) {
+  function parseLine(line, unknown, names) {
     const segs = [];
     const re = /\[[^\]]*\]?|[^\s\[]+/g;
     let m;
@@ -330,7 +388,7 @@ footer a { color: inherit; }
 
       if (isKnown(core)) {
         segs.push({ t: core.toLowerCase() + punct, glyph: true });
-      } else if (state.names && /^[A-Z][A-Za-z]*$/.test(core) && nameToCartouche(core)) {
+      } else if (names && /^[A-Z][A-Za-z]*$/.test(core) && nameToCartouche(core)) {
         segs.push({ t: nameToCartouche(core) + punct, glyph: true });
       } else {
         unknown.add(core);
@@ -354,8 +412,8 @@ footer a { color: inherit; }
   }
 
   // ---------- drawing ----------
-  const canvas = document.createElement("canvas");
-  const ctx = canvas.getContext("2d");
+  // Measuring context; each image is drawn on its own canvas in paint().
+  const ctx = document.createElement("canvas").getContext("2d");
 
   function fontFor(seg, size) {
     return seg.glyph ? `${size}px ${FONT}` : `600 ${Math.round(size * 0.42)}px ${SANS}`;
@@ -381,14 +439,52 @@ footer a { color: inherit; }
 
   let currentBlob = null, currentUrl = null, renderPromise = null;
 
-  function render() {
-    const unknown = new Set();
-    const lines = textEl.value.split("\n").flatMap((l) => {
-      const segs = parseLine(l, unknown);
-      return state.sentences ? splitSentences(segs) : [segs];
+  // Text → lines of segments, shaped by the names and sentences settings. `unknown` collects words drawn as plain letters.
+  function parseText(text, opts, unknown = new Set()) {
+    const lines = text.split("\n").flatMap((l) => {
+      const segs = parseLine(l, unknown, opts.names);
+      return opts.sentences ? splitSentences(segs) : [segs];
     });
     while (lines.length && !lines[lines.length - 1].length) lines.pop();
     while (lines.length && !lines[0].length) lines.shift();
+    return lines;
+  }
+
+  // Draws one message on a fresh canvas with the given size, style, names and sentences settings.
+  function paint(text, opts, unknown) {
+    const lines = parseText(text, opts, unknown);
+    const st = STYLES.find((s) => s.id === opts.style) || STYLES[0];
+    const size = SIZES[opts.size] || SIZES.s;
+    const empty = !lines.length;
+    const { rows, gap } = layout(empty ? [[{ t: "toki", glyph: true }]] : lines, size, opts.sentences ? GLYPHS_PER_SENTENCE_LINE : GLYPHS_PER_LINE);
+
+    const pad = Math.round(size * 0.45);
+    const lineH = Math.round(size * 1.3);
+    const contentW = Math.max(size, ...rows.map((r) => r.w));
+    const c = document.createElement("canvas");
+    c.width = Math.ceil(contentW + pad * 2);
+    c.height = Math.ceil(rows.length * lineH - (lineH - size * 1.1) + pad * 2);
+    const g = c.getContext("2d");
+    g.fillStyle = st.bg;
+    g.fillRect(0, 0, c.width, c.height);
+    g.fillStyle = st.ink;
+    if (empty) g.globalAlpha = 0.25;
+    g.textBaseline = "middle";
+    rows.forEach((row, i) => {
+      let x = pad;
+      const y = pad + i * lineH + size * 0.55;
+      for (const seg of row.segs) {
+        g.font = fontFor(seg, size);
+        g.fillText(seg.t, x, y);
+        x += seg.w + gap;
+      }
+    });
+    return c;
+  }
+
+  function render() {
+    const unknown = new Set();
+    const c = paint(textEl.value, state, unknown);
 
     if (unknown.size) {
       unknownEl.innerHTML = "";
@@ -398,34 +494,7 @@ footer a { color: inherit; }
       unknownEl.hidden = false;
     } else unknownEl.hidden = true;
 
-    const st = STYLES.find((s) => s.id === state.style);
-    const size = SIZES[state.size];
-    const empty = !lines.length;
-    const { rows, gap } = layout(empty ? [[{ t: "toki", glyph: true }]] : lines, size, state.sentences ? GLYPHS_PER_SENTENCE_LINE : GLYPHS_PER_LINE);
-
-    const pad = Math.round(size * 0.45);
-    const lineH = Math.round(size * 1.3);
-    const contentW = Math.max(size, ...rows.map((r) => r.w));
-    canvas.width = Math.ceil(contentW + pad * 2);
-    canvas.height = Math.ceil(rows.length * lineH - (lineH - size * 1.1) + pad * 2);
-
-    ctx.fillStyle = st.bg;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = st.ink;
-    if (empty) ctx.globalAlpha = 0.25;
-    ctx.textBaseline = "middle";
-    rows.forEach((row, i) => {
-      let x = pad;
-      const y = pad + i * lineH + size * 0.55;
-      for (const seg of row.segs) {
-        ctx.font = fontFor(seg, size);
-        ctx.fillText(seg.t, x, y);
-        x += seg.w + gap;
-      }
-    });
-    ctx.globalAlpha = 1;
-
-    renderPromise = new Promise((resolve) => canvas.toBlob((blob) => {
+    renderPromise = new Promise((resolve) => c.toBlob((blob) => {
       currentBlob = blob;
       if (currentUrl) URL.revokeObjectURL(currentUrl);
       currentUrl = URL.createObjectURL(blob);
@@ -451,6 +520,7 @@ footer a { color: inherit; }
   function blobNow() { return currentBlob ? Promise.resolve(currentBlob) : renderPromise; }
 
   copyBtn.addEventListener("click", async () => {
+    recordRecent();
     try {
       if (!window.ClipboardItem || !navigator.clipboard?.write) throw new Error("unsupported");
       // Safari wants the promise handed over synchronously inside the tap.
@@ -468,6 +538,7 @@ footer a { color: inherit; }
       try {
         const blob = await blobNow();
         await navigator.share({ files: [new File([blob], "sitelen-pona.png", { type: "image/png" })] });
+        recordRecent();
       } catch (e) {
         if (e && e.name === "AbortError") return;
         toast("Sharing isn't available here. Use Copy instead.");
@@ -475,6 +546,7 @@ footer a { color: inherit; }
     });
   }
   if (!window.__IS_ARTIFACT__) saveLink.hidden = false;
+  saveLink.addEventListener("click", () => recordRecent());
 
   // ---------- options ----------
   const sizeGroup = $("size");
@@ -510,19 +582,182 @@ footer a { color: inherit; }
   sentencesEl.checked = state.sentences;
   sentencesEl.addEventListener("change", () => { state.sentences = sentencesEl.checked; store.set("sentences", state.sentences ? "1" : "0"); render(); });
 
-  textEl.addEventListener("input", () => { store.set("text", textEl.value); scheduleRender(); });
+  textEl.addEventListener("input", () => { store.set("text", textEl.value); scheduleRender(); syncActive(); });
 
   syncSize(); syncStyle();
-  document.fonts.load(`64px ${FONT}`, "toki").then(render, render);
+  let fontsReady = false;
+  function boot() { fontsReady = true; render(); renderShelf(); }
+  document.fonts.load(`64px ${FONT}`, "toki").then(boot, boot);
+
+  // ---------- recents: what you sent, as you sent it ----------
+  // Copy, Share and Save count as sending. Each entry keeps the text and the four settings, never the PNG; the image
+  // is drawn again when needed. One localStorage key, newest first, capped. On a Safari tab on iOS all of this
+  // storage goes after 7 days of Safari use without a tap here; a Home Screen app is exempt, hence the footer note.
+  const standalone = matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+  const iOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  const RECENTS_MAX = 50;
+  const DAY = 864e5;
+  const wide = matchMedia("(min-width: 960px)");
+  const ICON_COPY = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>';
+
+  function loadRecents() {
+    try {
+      const list = JSON.parse(store.get("recents", "[]"));
+      return Array.isArray(list) ? list.filter((r) => r && typeof r.text === "string" && typeof r.at === "number").slice(0, RECENTS_MAX) : [];
+    } catch { return []; }
+  }
+  let recents = loadRecents();
+  const saveRecents = () => store.set("recents", JSON.stringify(recents));
+  const settingsOf = (r) => ({
+    size: SIZES[r.size] ? r.size : "s",
+    style: STYLES.some((s) => s.id === r.style) ? r.style : "night",
+    names: r.names !== false,
+    sentences: r.sentences !== false,
+  });
+
+  function recordRecent(entry) {
+    const e = entry || { text: textEl.value.trim(), size: state.size, style: state.style, names: state.names, sentences: state.sentences };
+    if (!e.text) return;
+    const i = recents.findIndex((r) => r.text === e.text);
+    if (i >= 0) recents.splice(i, 1);
+    recents.unshift({ text: e.text, size: e.size, style: e.style, names: e.names, sentences: e.sentences, at: Date.now() });
+    if (recents.length > RECENTS_MAX) recents.length = RECENTS_MAX;
+    saveRecents();
+    renderShelf();
+    if (store.get("persist-asked", "0") !== "1") {
+      store.set("persist-asked", "1");
+      try { navigator.storage?.persist?.().catch(() => {}); } catch {}
+    }
+  }
+
+  const thumbs = new Map();
+  function thumbUrl(r) {
+    const o = settingsOf(r), key = JSON.stringify([r.text, o]);
+    if (!thumbs.has(key)) {
+      if (thumbs.size > 2 * RECENTS_MAX) thumbs.clear();
+      thumbs.set(key, paint(r.text, o).toDataURL("image/png"));
+    }
+    return thumbs.get(key);
+  }
+
+  function startOfDay(t) { const d = new Date(t); return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime(); }
+  function groupOf(at) {
+    const days = Math.round((startOfDay(Date.now()) - startOfDay(at)) / DAY);
+    return days <= 0 ? "Today" : days === 1 ? "Yesterday" : days < 7 ? "Previous 7 days" : "Older";
+  }
+  function timeAgo(at) {
+    const sec = (Date.now() - at) / 1e3;
+    if (sec < 60) return "Just now";
+    if (sec < 3600) return Math.round(sec / 60) + " min ago";
+    if (sec < 86400) return Math.round(sec / 3600) + " h ago";
+    const d = Math.round(sec / 86400);
+    if (d === 1) return "Yesterday";
+    if (d < 7) return new Date(at).toLocaleDateString(undefined, { weekday: "short" });
+    return new Date(at).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  }
+  function firstLine(text) {
+    const ls = text.split("\n").filter((l) => l.trim());
+    return ls[0] + (ls.length > 1 ? " …" : "");
+  }
+
+  function el(tag, props, ...kids) {
+    const n = document.createElement(tag);
+    for (const [k, v] of Object.entries(props)) {
+      if (k === "class") n.className = v;
+      else if (k.startsWith("on")) n.addEventListener(k.slice(2), v);
+      else n.setAttribute(k, v);
+    }
+    for (const k of kids) n.append(k);
+    return n;
+  }
+
+  let cards = [];
+  function renderShelf() {
+    if (!fontsReady) return;
+    shelfList.replaceChildren();
+    cards = [];
+    if (!recents.length) {
+      shelfList.append(el("p", { class: "s-empty" }, "Images you copy, share or save will show up here."));
+      return;
+    }
+    let group = null;
+    for (const r of recents) {
+      const g = groupOf(r.at);
+      if (g !== group) { group = g; shelfList.append(el("div", { class: "s-day" }, g)); }
+      const copy = el("button", { class: "card-copy", type: "button", "aria-label": "Copy this image", title: "Copy image", onclick: () => copyRecent(r) });
+      copy.innerHTML = ICON_COPY;
+      const card = el("article", { class: "card" },
+        el("button", { class: "card-img", type: "button", "aria-label": "Open: " + firstLine(r.text), onclick: () => openRecent(r) }, el("img", { src: thumbUrl(r), alt: "" })),
+        el("div", { class: "card-meta" },
+          el("span", { class: "card-text", title: r.text }, firstLine(r.text)),
+          el("span", { class: "card-time" }, timeAgo(r.at)),
+          copy));
+      cards.push([card, r]);
+      shelfList.append(card);
+    }
+    syncActive();
+  }
+  // The card whose message is in the box right now.
+  function syncActive() {
+    const cur = textEl.value.trim();
+    for (const [card, r] of cards) card.classList.toggle("active", r.text === cur);
+  }
+
+  function openRecent(r) {
+    const o = settingsOf(r);
+    textEl.value = r.text; store.set("text", r.text);
+    state.size = o.size; state.style = o.style; state.names = o.names; state.sentences = o.sentences;
+    store.set("size", state.size); store.set("style", state.style);
+    store.set("names", state.names ? "1" : "0"); store.set("sentences", state.sentences ? "1" : "0");
+    syncSize(); syncStyle(); namesEl.checked = state.names; sentencesEl.checked = state.sentences;
+    render(); syncActive();
+    if (!wide.matches) setShelf(false);
+  }
+  function newMessage() {
+    textEl.value = ""; store.set("text", "");
+    render(); syncActive();
+    if (!wide.matches) setShelf(false);
+    textEl.focus();
+  }
+  async function copyRecent(r) {
+    const o = settingsOf(r);
+    try {
+      if (!window.ClipboardItem || !navigator.clipboard?.write) throw new Error("unsupported");
+      // Safari wants the promise handed over synchronously inside the tap.
+      const png = new Promise((resolve) => paint(r.text, o).toBlob(resolve, "image/png"));
+      await navigator.clipboard.write([new ClipboardItem({ "image/png": png })]);
+      toast("Copied. Paste it in your chat.");
+    } catch {
+      toast("Copying isn't allowed here. Open it, then press and hold the image.");
+    }
+    recordRecent({ text: r.text, ...o });
+  }
+
+  let shelfOpen = false;
+  function setShelf(open) {
+    shelfOpen = open;
+    document.body.classList.toggle("shelf-open", open);
+    scrimEl.hidden = !open || wide.matches;
+    recentsBtn.setAttribute("aria-expanded", String(open));
+    if (wide.matches) store.set("shelf", open ? "1" : "0");
+    if (open) renderShelf();
+  }
+  const wantsShelf = () => wide.matches && store.get("shelf", "1") === "1";
+  recentsBtn.addEventListener("click", () => { setShelf(true); if (!wide.matches) $("s-close").focus(); });
+  $("s-close").addEventListener("click", () => { setShelf(false); recentsBtn.focus(); });
+  $("s-new").addEventListener("click", newMessage);
+  scrimEl.addEventListener("click", () => setShelf(false));
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && shelfOpen && !wide.matches) { setShelf(false); recentsBtn.focus(); } });
+  wide.addEventListener("change", () => setShelf(wantsShelf()));
+  if (iOS && !standalone) $("s-foot").textContent = "Saved on this phone only. They last longest when the app is on your Home Screen.";
+  setShelf(wantsShelf());
 
   // ---------- install banner ----------
   (function installBanner() {
     const banner = $("install"), how = $("install-how"), btn = $("install-btn"), closeBtn = $("install-close");
-    const standalone = matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
     if (standalone || store.get("install-dismissed", "0") === "1") return;
 
     const ua = navigator.userAgent;
-    const iOS = /iPhone|iPad|iPod/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
     const safari = /Safari\//.test(ua) && !/Chrome|CriOS|Chromium|Edg|FxiOS|OPR/.test(ua);
     const shareIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="M8 7l4-4 4 4"/><path d="M5 11v8a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-8"/></svg>';
     let deferred = null;

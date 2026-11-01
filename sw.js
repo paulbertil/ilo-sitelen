@@ -1,6 +1,6 @@
 // ilo sitelen service worker: keeps the app usable offline.
 // The sitelen pona font is embedded in index.html, so caching the shell is enough.
-const CACHE = "ilo-sitelen-v2";
+const CACHE = "ilo-sitelen-v3";
 const SHELL = [
   "./",
   "./index.html",
