@@ -232,6 +232,10 @@ footer a { color: inherit; }
       <span>Names</span>
       <label class="switch"><input type="checkbox" id="names" checked> Put capitalized names in a cartouche</label>
     </div>
+    <div class="row">
+      <span>Lines</span>
+      <label class="switch"><input type="checkbox" id="sentences" checked> Start a new line after each sentence</label>
+    </div>
   </section>
 
   <details>
@@ -241,7 +245,7 @@ footer a { color: inherit; }
       <li>Or build a cartouche yourself: <code>[mama ala lipu ilo]</code></li>
       <li>Join two glyphs with <code>&amp;</code>, stack them with <code>-</code>, or scale them with <code>+</code>: <code>toki&amp;pona</code></li>
       <li>Add <code>1</code> after a word for its alternate glyph: <code>mute1</code>, <code>sewi1</code></li>
-      <li>Start a new line in the text to start a new line in the image.</li>
+      <li>Each sentence ending in <code>.</code>, <code>!</code> or <code>?</code> starts a new line in the image. Turn that off under Lines, or start a new line in the text yourself.</li>
     </ul>
   </details>
 
@@ -265,7 +269,10 @@ footer a { color: inherit; }
     { id: "paper", name: "White", bg: "#ffffff", ink: "#15191a" },
   ];
   const SIZES = { s: 64, m: 96, l: 140 };
+  // Width cap in glyph widths (gaps included). Flowing text stays compact; one sentence per line gets room
+  // so a normal sentence fits on one row, like the handwritten originals.
   const GLYPHS_PER_LINE = 9;
+  const GLYPHS_PER_SENTENCE_LINE = 18; // 13 glyphs + a middle dot, with 0.3 em gaps
   const FONT = "NasinNanpa";
   const SANS = 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
 
@@ -282,6 +289,7 @@ footer a { color: inherit; }
     size: store.get("size", "s"),
     style: store.get("style", "night"),
     names: store.get("names", "1") === "1",
+    sentences: store.get("sentences", "1") === "1",
   };
   if (!SIZES[state.size]) state.size = "s";
   if (!STYLES.some((s) => s.id === state.style)) state.style = "night";
@@ -332,6 +340,19 @@ footer a { color: inherit; }
     return segs;
   }
 
+  // One sentence per line, like handwritten sitelen pona. A line with no sentence end stays as it is.
+  const SENTENCE_END = /[.!?]$/;
+  function splitSentences(segs) {
+    const lines = [];
+    let cur = [];
+    for (const seg of segs) {
+      cur.push(seg);
+      if (SENTENCE_END.test(seg.t)) { lines.push(cur); cur = []; }
+    }
+    if (cur.length) lines.push(cur);
+    return lines.length ? lines : [[]];
+  }
+
   // ---------- drawing ----------
   const canvas = document.createElement("canvas");
   const ctx = canvas.getContext("2d");
@@ -340,8 +361,8 @@ footer a { color: inherit; }
     return seg.glyph ? `${size}px ${FONT}` : `600 ${Math.round(size * 0.42)}px ${SANS}`;
   }
 
-  function layout(lines, size) {
-    const maxW = size * GLYPHS_PER_LINE;
+  function layout(lines, size, maxGlyphs) {
+    const maxW = size * maxGlyphs;
     const gap = size * 0.3;
     const rows = [];
     for (const segs of lines) {
@@ -362,7 +383,10 @@ footer a { color: inherit; }
 
   function render() {
     const unknown = new Set();
-    const lines = textEl.value.split("\n").map((l) => parseLine(l, unknown));
+    const lines = textEl.value.split("\n").flatMap((l) => {
+      const segs = parseLine(l, unknown);
+      return state.sentences ? splitSentences(segs) : [segs];
+    });
     while (lines.length && !lines[lines.length - 1].length) lines.pop();
     while (lines.length && !lines[0].length) lines.shift();
 
@@ -377,7 +401,7 @@ footer a { color: inherit; }
     const st = STYLES.find((s) => s.id === state.style);
     const size = SIZES[state.size];
     const empty = !lines.length;
-    const { rows, gap } = layout(empty ? [[{ t: "toki", glyph: true }]] : lines, size);
+    const { rows, gap } = layout(empty ? [[{ t: "toki", glyph: true }]] : lines, size, state.sentences ? GLYPHS_PER_SENTENCE_LINE : GLYPHS_PER_LINE);
 
     const pad = Math.round(size * 0.45);
     const lineH = Math.round(size * 1.3);
@@ -481,6 +505,10 @@ footer a { color: inherit; }
   const namesEl = $("names");
   namesEl.checked = state.names;
   namesEl.addEventListener("change", () => { state.names = namesEl.checked; store.set("names", state.names ? "1" : "0"); render(); });
+
+  const sentencesEl = $("sentences");
+  sentencesEl.checked = state.sentences;
+  sentencesEl.addEventListener("change", () => { state.sentences = sentencesEl.checked; store.set("sentences", state.sentences ? "1" : "0"); render(); });
 
   textEl.addEventListener("input", () => { store.set("text", textEl.value); scheduleRender(); });
 

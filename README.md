@@ -11,6 +11,7 @@ A small installable web app (PWA). No build step, no backend: everything happens
 - Capitalized words are treated as names and written in a cartouche, one glyph per sound. `jan Mali` becomes `[mama ala lipu ilo]`.
 - Words outside pu and ku suli are flagged and drawn as plain letters.
 - Punctuation follows sitelen pona conventions: `.` becomes the middle dot, `:` the colon glyph, `?` and `!` are kept, commas are dropped.
+- Each sentence starts on its own line, like handwritten sitelen pona. Can be turned off.
 - Three sizes and two color styles. Settings are remembered between visits.
 - Works offline once installed. An install banner explains how on iOS, Android and desktop.
 
@@ -19,7 +20,7 @@ A small installable web app (PWA). No build step, no backend: everything happens
 - Write names with a capital letter, or build a cartouche yourself: `[mama ala lipu ilo]`.
 - Join glyphs with `&`, stack with `-`, scale with `+`: `toki&pona`.
 - Add `1` after a word for its alternate glyph: `mute1`, `sewi1`.
-- A line break in the text starts a new line in the image.
+- A sentence ending in `.`, `!` or `?` starts a new line in the image. A line break in the text does too.
 
 ## Files
 
