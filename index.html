@@ -101,6 +101,7 @@ textarea {
   background: var(--surface); border: 1.5px solid var(--line);
   border-radius: var(--radius); padding: 12px 14px;
 }
+textarea::placeholder { color: var(--muted); opacity: 0.7; }
 textarea:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent); }
 
 .unknown {
@@ -197,8 +198,7 @@ footer a { color: inherit; }
 
   <section>
     <label class="lbl" for="text">Your message</label>
-    <textarea id="text" autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false">toki! mi jan Mali.
-mi kama sona e toki pona. sina pona a!</textarea>
+    <textarea id="text" autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="toki! mi jan Mali."></textarea>
     <div class="unknown" id="unknown" hidden></div>
   </section>
 
@@ -279,11 +279,11 @@ mi kama sona e toki pona. sina pona a!</textarea>
   };
 
   const state = {
-    size: store.get("size", "m"),
+    size: store.get("size", "s"),
     style: store.get("style", "night"),
     names: store.get("names", "1") === "1",
   };
-  if (!SIZES[state.size]) state.size = "m";
+  if (!SIZES[state.size]) state.size = "s";
   if (!STYLES.some((s) => s.id === state.style)) state.style = "night";
   const savedText = store.get("text", null);
   if (savedText !== null) textEl.value = savedText;
