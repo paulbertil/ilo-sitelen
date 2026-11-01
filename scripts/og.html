@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>og.png for ilo sitelen</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@600&display=swap">
+<style>
+  body { margin: 0; padding: 24px; font: 16px/1.5 system-ui, sans-serif; background: #f3f6f5; color: #16201e; }
+  canvas { display: block; max-width: 100%; height: auto; box-shadow: 0 1px 0 #d9e2df, 0 12px 32px rgba(0, 0, 0, 0.12); border-radius: 10px; }
+  p { max-width: 70ch; }
+  output { display: none; }
+</style>
+</head>
+<body>
+<!--
+  Draws og.png, the 1200 by 630 link card decided on https://github.com/paulbertil/ilo-sitelen/issues/12:
+  what the app draws for "toki! mi jan Ali. sina pona ala pona?" on the dark output style, signed with the mark and the name.
+  The sitelen pona font is read out of ../index.html so it stays single-sourced. fetch() does not work over file://, so run
+  from the repo root with `python3 -m http.server` and open http://localhost:8000/scripts/og.html, then save the PNG.
+  Rerun it whenever the sample or the style changes, and give the file a new name (og-2.png) so chat apps drop their cached copy.
+  scripts/ is excluded from the deployment by .vercelignore.
+-->
+<h1>og.png</h1>
+<p id="status">Drawing…</p>
+<canvas id="card" width="1200" height="630"></canvas>
+<p><a id="save" download="og.png" hidden>Save og.png</a></p>
+<output id="png"></output>
+<script>
+(async () => {
+  const status = document.getElementById("status");
+  try {
+    // The font, out of the app page.
+    const html = await (await fetch("../index.html")).text();
+    const m = html.match(/font-family:'NasinNanpa';src:url\((data:font\/woff2;base64,[A-Za-z0-9+/=]+)\)/);
+    if (!m) throw new Error("NasinNanpa data URI not found in ../index.html");
+    const nasin = new FontFace("NasinNanpa", `url(${m[1]})`);
+    document.fonts.add(await nasin.load());
+    await document.fonts.load("600 40px Fredoka");
+    await document.fonts.ready;
+
+    // The spec, in image pixels.
+    const W = 1200, H = 630, BG = "#1b2120", INK = "#eef3f1", TEAL = "#0e7c74";
+    const GS = 118, GAP = GS * 0.3, SHIFT_UP = 35;
+    const ROWS = [["toki!"], ["mi", "jan", "[alalipuilo]."], ["sina", "pona", "ala", "pona?"]];
+    const GLYPH = `${GS}px NasinNanpa`, MARKGLYPH = "38px NasinNanpa", WORD = "600 40px Fredoka";
+
+    const c = document.getElementById("card");
+    const g = c.getContext("2d");
+    g.fillStyle = BG;
+    g.fillRect(0, 0, W, H);
+
+    // Baseline for text in a line box of height `box` with line-height 1: half-leading above the font's content area.
+    const baseline = (top, box, font, text) => {
+      g.font = font;
+      const mt = g.measureText(text);
+      return top + (box - (mt.fontBoundingBoxAscent + mt.fontBoundingBoxDescent)) / 2 + mt.fontBoundingBoxAscent;
+    };
+
+    // Rows: left-aligned, the block centred and shifted up to leave room for the chip.
+    g.font = GLYPH;
+    const widths = ROWS.map((row) => row.map((t) => g.measureText(t).width));
+    const rowW = widths.map((ws) => ws.reduce((a, b) => a + b, 0) + GAP * (ws.length - 1));
+    const blockW = Math.max(...rowW), blockH = ROWS.length * GS + GAP * (ROWS.length - 1);
+    const left = (W - blockW) / 2, top = (H - blockH) / 2 - SHIFT_UP;
+    g.fillStyle = INK;
+    g.textBaseline = "alphabetic";
+    ROWS.forEach((row, i) => {
+      const rowTop = top + i * (GS + GAP);
+      let x = left;
+      row.forEach((t, j) => {
+        g.font = GLYPH;
+        g.fillText(t, x, baseline(rowTop, GS, GLYPH, t));
+        x += widths[i][j] + GAP;
+      });
+    });
+
+    // Chip, bottom right: the mark, then the name.
+    g.font = WORD; g.letterSpacing = "0.4px";
+    const wordW = g.measureText("ilo sitelen").width;
+    const MARK = 56, R = 16, CHIPGAP = 16;
+    const chipW = MARK + CHIPGAP + wordW;
+    const chipLeft = W - 56 - chipW, chipTop = H - 44 - MARK;
+    g.fillStyle = TEAL;
+    g.beginPath(); g.roundRect(chipLeft, chipTop, MARK, MARK, R); g.fill();
+    g.fillStyle = "#ffffff";
+    g.letterSpacing = "0px";
+    g.font = MARKGLYPH;
+    const iloW = g.measureText("ilo").width;
+    g.fillText("ilo", chipLeft + (MARK - iloW) / 2, baseline(chipTop + (MARK - 38) / 2, 38, MARKGLYPH, "ilo"));
+    g.fillStyle = INK;
+    g.font = WORD; g.letterSpacing = "0.4px";
+    g.fillText("ilo sitelen", chipLeft + MARK + CHIPGAP, baseline(chipTop + (MARK - 40) / 2, 40, WORD, "ilo sitelen"));
+    g.letterSpacing = "0px";
+
+    const url = c.toDataURL("image/png");
+    const a = document.getElementById("save");
+    a.href = url; a.hidden = false;
+    document.getElementById("png").textContent = url;
+    status.textContent = `Done: ${W}×${H}, about ${Math.round((url.length - 22) * 3 / 4 / 1024)} KB. Save it as og.png at the repo root.`;
+  } catch (e) {
+    status.textContent = "Failed: " + e.message;
+  }
+})();
+</script>
+</body>
+</html>

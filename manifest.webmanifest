@@ -1,9 +1,9 @@
 {
   "name": "ilo sitelen",
   "short_name": "ilo sitelen",
-  "description": "Type toki pona, get a sitelen pona image you can paste into any chat.",
+  "description": "Type toki pona, get a sitelen pona image to paste into WhatsApp, Discord or any chat. A free sitelen pona generator for your phone, no font to install.",
   "id": "./",
-  "start_url": "./",
+  "start_url": "./?utm_source=pwa",
   "scope": "./",
   "display": "standalone",
   "background_color": "#0e1413",
