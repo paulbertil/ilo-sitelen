@@ -13,6 +13,7 @@ A small installable web app (PWA). No build step, no backend: everything happens
 - Punctuation follows sitelen pona conventions: `.` becomes the middle dot, `:` the colon glyph, `?` and `!` are kept, commas are dropped.
 - Each sentence starts on its own line, like handwritten sitelen pona. Can be turned off.
 - Three sizes and two color styles. Settings are remembered between visits.
+- Light or dark: the app follows your device, and the moon or sun button in the top bar flips it. Flip back to what your device shows and it follows the device again.
 - Works offline once installed. An install banner explains how on iOS, Android and desktop.
 - **Recents** keeps the last 50 messages you copied, shared or saved, as the images you sent them. Open it from the panel button in the header; copy one again, tap it to bring it back into the message box, or remove it. Kept on this device only.
 
