@@ -27,6 +27,7 @@
   --accent-ink: #ffffff;
   --warn-bg: #fff4d6;
   --warn-fg: #6b4e00;
+  --danger: #b3261e;
   --font-display: "Fredoka", "Avenir Next Rounded", ui-rounded, system-ui, sans-serif;
   --font-body: "Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", sans-serif;
   --radius: 14px;
@@ -35,13 +36,13 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --bg: #0e1413; --surface: #172120; --fg: #e5eeec; --muted: #93a6a1; --line: #2a3735;
-    --accent: #49c2b4; --accent-ink: #062320; --warn-bg: #3a2f10; --warn-fg: #f3d58a;
+    --accent: #49c2b4; --accent-ink: #062320; --warn-bg: #3a2f10; --warn-fg: #f3d58a; --danger: #ff8a80;
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
   --bg: #0e1413; --surface: #172120; --fg: #e5eeec; --muted: #93a6a1; --line: #2a3735;
-  --accent: #49c2b4; --accent-ink: #062320; --warn-bg: #3a2f10; --warn-fg: #f3d58a;
+  --accent: #49c2b4; --accent-ink: #062320; --warn-bg: #3a2f10; --warn-fg: #f3d58a; --danger: #ff8a80;
   color-scheme: dark;
 }
 
@@ -208,6 +209,9 @@ body.shelf-open .shelf { transform: none; visibility: visible; transition: trans
 .card-copy { padding: 7px; border-radius: 8px; border-color: transparent; background: transparent; color: var(--muted); flex: none; }
 .card-copy:hover { background: color-mix(in srgb, var(--fg) 6%, transparent); color: var(--accent); }
 .card-copy svg { width: 17px; height: 17px; }
+.card-del:hover { color: var(--danger); }
+.card-act { padding: 6px 11px; font-size: 0.82rem; border-radius: 8px; flex: none; }
+.card-act.danger { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 45%, transparent); }
 .s-foot { margin: 0; border-top: 1.5px solid var(--line); padding: 10px 16px; font-size: 0.78rem; color: var(--muted); }
 @media (min-width: 900px) {
   body { transition: padding-left .22s ease; }
@@ -604,6 +608,7 @@ body.shelf-open .shelf { transform: none; visibility: visible; transition: trans
   const DAY = 864e5;
   const wide = matchMedia("(min-width: 900px)");
   const ICON_COPY = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>';
+  const ICON_TRASH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16"/><path d="M10 11v6M14 11v6"/><path d="M6 7l1 13h10l1-13"/><path d="M9 7V4h6v3"/></svg>';
 
   function loadRecents() {
     try {
@@ -677,6 +682,7 @@ body.shelf-open .shelf { transform: none; visibility: visible; transition: trans
   }
 
   let cards = [];
+  let pendingDelete = null; // text of the card asking "Remove this message?"
   function renderShelf() {
     if (!fontsReady) return;
     shelfList.replaceChildren();
@@ -689,14 +695,25 @@ body.shelf-open .shelf { transform: none; visibility: visible; transition: trans
     for (const r of recents) {
       const g = groupOf(r.at);
       if (g !== group) { group = g; shelfList.append(el("div", { class: "s-day" }, g)); }
-      const copy = el("button", { class: "card-copy", type: "button", "aria-label": "Copy this image", title: "Copy image", onclick: () => copyRecent(r) });
-      copy.innerHTML = ICON_COPY;
-      const card = el("article", { class: "card" },
-        el("button", { class: "card-img", type: "button", "aria-label": "Open: " + firstLine(r.text), onclick: () => openRecent(r) }, el("img", { src: thumbUrl(r), alt: "" })),
-        el("div", { class: "card-meta" },
+      let meta;
+      if (pendingDelete === r.text) {
+        meta = el("div", { class: "card-meta" },
+          el("span", { class: "card-text" }, "Remove this message?"),
+          el("button", { class: "card-act danger", type: "button", onclick: () => deleteRecent(r) }, "Remove"),
+          el("button", { class: "card-act", type: "button", onclick: () => { pendingDelete = null; renderShelf(); } }, "Keep"));
+      } else {
+        const copy = el("button", { class: "card-copy", type: "button", "aria-label": "Copy this image", title: "Copy image", onclick: () => copyRecent(r) });
+        copy.innerHTML = ICON_COPY;
+        const del = el("button", { class: "card-copy card-del", type: "button", "aria-label": "Remove from Recents", title: "Remove", onclick: () => { pendingDelete = r.text; renderShelf(); } });
+        del.innerHTML = ICON_TRASH;
+        meta = el("div", { class: "card-meta" },
           el("span", { class: "card-text", title: r.text }, firstLine(r.text)),
           el("span", { class: "card-time" }, timeAgo(r.at)),
-          copy));
+          copy, del);
+      }
+      const card = el("article", { class: "card" },
+        el("button", { class: "card-img", type: "button", "aria-label": "Open: " + firstLine(r.text), onclick: () => openRecent(r) }, el("img", { src: thumbUrl(r), alt: "" })),
+        meta);
       cards.push([card, r]);
       shelfList.append(card);
     }
@@ -717,6 +734,13 @@ body.shelf-open .shelf { transform: none; visibility: visible; transition: trans
     syncSize(); syncStyle(); namesEl.checked = state.names; sentencesEl.checked = state.sentences;
     render(); syncActive();
     if (!wide.matches) setShelf(false);
+  }
+  function deleteRecent(r) {
+    const i = recents.findIndex((x) => x.text === r.text);
+    if (i >= 0) recents.splice(i, 1);
+    pendingDelete = null;
+    saveRecents(); renderShelf();
+    toast("Removed from Recents.");
   }
   function newMessage() {
     textEl.value = ""; store.set("text", "");
@@ -744,6 +768,7 @@ body.shelf-open .shelf { transform: none; visibility: visible; transition: trans
     document.body.classList.toggle("shelf-open", open);
     scrimEl.hidden = !open || wide.matches;
     recentsBtn.setAttribute("aria-expanded", String(open));
+    if (!open) pendingDelete = null;
     if (open) renderShelf();
   }
   const wantsShelf = () => wide.matches;
