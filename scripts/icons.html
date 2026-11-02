@@ -15,9 +15,13 @@
 </head>
 <body>
 <!--
-  Draws the app icons in the app's own look: the mark, an ink outline around a cream tile with the ilo glyph inside.
-  - icon-192.png, icon-512.png: the mark as a rounded square with transparent corners, shown as-is by desktop browsers.
-  - apple-touch-icon.png: full-bleed cream with the outline inset, so iOS's own rounding leaves a bordered tile.
+  Draws the app icons in the app's own look: the mark from the top bar, an ink frame around a cream tile with the ilo glyph
+  inside. The tile is the iOS home screen shape, a rounded square with continuous corners, so the frame keeps an even width
+  after iOS cuts the icon to that shape. The glyph is stroked a little so its monoline sits at the weight of the app's 3px lines.
+  Chosen on 2026-11-02 from six candidates compared on mock home screens (frameless paper, ochre with and without the frame,
+  the dark-mode mark, and the mark as a sticker on ochre were the others).
+  - icon-192.png, icon-512.png: the mark with transparent corners, shown as-is by desktop browsers.
+  - apple-touch-icon.png: full-bleed, ink to the edge and the cream tile inset by the frame width; iOS rounds it itself.
   - icon-maskable-512.png: full-bleed cream, the glyph alone inside the safe zone, for Android launchers to shape.
   The sitelen pona font is read out of ../index.html so it stays single-sourced. fetch() does not work over file://, so run
   from the repo root with `python3 -m http.server` and open http://localhost:8000/scripts/icons.html, then save each PNG into icons/.
@@ -38,6 +42,36 @@
     await document.fonts.ready;
 
     const PAPER = "#f5ecd7", INK = "#121110";
+    const IOS_R = 0.2237; // the corner radius of an iOS icon, as a share of its side
+    const rad = (deg) => deg * Math.PI / 180;
+
+    // The iOS icon shape: a rounded square whose corners run into the sides without a kink (Figma's corner smoothing, 0.6
+    // for iOS). The same construction as the figma-squircle package, as a Path2D.
+    function squircle(x, y, w, h, r, s = 0.6) {
+      const budget = Math.min(w, h) / 2;
+      let sm = s, p = (1 + s) * r;
+      if (p > budget) { sm = Math.min(s, budget / r - 1); p = Math.min(p, budget); }
+      const arc = 90 * (1 - sm);
+      const L = Math.sin(rad(arc / 2)) * r * Math.SQRT2;
+      const alpha = (90 - arc) / 2;
+      const p34 = r * Math.tan(rad(alpha / 2));
+      const beta = 45 * sm;
+      const c = p34 * Math.cos(rad(beta));
+      const d = c * Math.tan(rad(beta));
+      const b = (p - L - c - d) / 3, a = 2 * b;
+      return new Path2D([
+        `M ${x + w - p} ${y}`,
+        `c ${a} 0 ${a + b} 0 ${a + b + c} ${d}`, `a ${r} ${r} 0 0 1 ${L} ${L}`, `c ${d} ${c} ${d} ${b + c} ${d} ${a + b + c}`,
+        `L ${x + w} ${y + h - p}`,
+        `c 0 ${a} 0 ${a + b} ${-d} ${a + b + c}`, `a ${r} ${r} 0 0 1 ${-L} ${L}`, `c ${-c} ${d} ${-(b + c)} ${d} ${-(a + b + c)} ${d}`,
+        `L ${x + p} ${y + h}`,
+        `c ${-a} 0 ${-(a + b)} 0 ${-(a + b + c)} ${-d}`, `a ${r} ${r} 0 0 1 ${-L} ${-L}`, `c ${-d} ${-c} ${-d} ${-(b + c)} ${-d} ${-(a + b + c)}`,
+        `L ${x} ${y + p}`,
+        `c 0 ${-a} 0 ${-(a + b)} ${d} ${-(a + b + c)}`, `a ${r} ${r} 0 0 1 ${L} ${-L}`, `c ${c} ${-d} ${b + c} ${-d} ${a + b + c} ${-d}`,
+        "Z",
+      ].join(" "));
+    }
+
     const SPECS = [
       { name: "icon-192.png", size: 192, shape: "mark" },
       { name: "icon-512.png", size: 512, shape: "mark" },
@@ -49,31 +83,30 @@
       const S = spec.size;
       const c = document.createElement("canvas"); c.width = S; c.height = S;
       const g = c.getContext("2d");
-      const glyph = (px) => {
-        const font = `${px}px NasinNanpa`;
-        g.font = font; g.fillStyle = INK; g.textBaseline = "alphabetic";
+      const BW = S * 0.08; // the frame: the app's 3px line on a 34px mark, scaled
+      // The ilo glyph, centred on the tile by its ink box, with a stroke of `bold` around the monoline.
+      const glyph = (px, bold) => {
+        g.font = `${px}px NasinNanpa`; g.textBaseline = "alphabetic";
         const mt = g.measureText("ilo");
-        const h = mt.fontBoundingBoxAscent + mt.fontBoundingBoxDescent;
-        g.fillText("ilo", (S - mt.width) / 2, (S - h) / 2 + mt.fontBoundingBoxAscent);
+        const w = mt.actualBoundingBoxLeft + mt.actualBoundingBoxRight, h = mt.actualBoundingBoxAscent + mt.actualBoundingBoxDescent;
+        const x = (S - w) / 2 + mt.actualBoundingBoxLeft, y = (S - h) / 2 + mt.actualBoundingBoxAscent;
+        g.lineWidth = bold; g.strokeStyle = INK; g.lineJoin = "round"; g.lineCap = "round"; g.strokeText("ilo", x, y);
+        g.fillStyle = INK; g.fillText("ilo", x, y);
       };
+      // The cream tile inset by the frame width; the ink behind it shows as the frame.
+      const tile = () => { g.fillStyle = PAPER; g.fill(squircle(BW, BW, S - 2 * BW, S - 2 * BW, S * IOS_R - BW)); };
       if (spec.shape === "mark") {
-        // The mark itself: cream rounded square, ink outline on its edge, transparent corners.
-        const sw = S * 0.07, r = S * 0.24;
-        g.beginPath(); g.roundRect(sw / 2, sw / 2, S - sw, S - sw, r);
-        g.fillStyle = PAPER; g.fill();
-        g.lineWidth = sw; g.strokeStyle = INK; g.stroke();
-        glyph(S * 0.55);
+        // The mark itself: ink in the iOS shape, the tile on it, transparent corners.
+        g.fillStyle = INK; g.fill(squircle(0, 0, S, S, S * IOS_R));
+        tile(); glyph(S * 0.58, S * 0.03);
       } else if (spec.shape === "apple") {
-        // iOS rounds the corners itself (about 22% of the size), so the outline sits a little in from the edge.
-        g.fillStyle = PAPER; g.fillRect(0, 0, S, S);
-        const inset = S * 0.06, sw = S * 0.06, r = S * 0.165;
-        g.beginPath(); g.roundRect(inset + sw / 2, inset + sw / 2, S - 2 * inset - sw, S - 2 * inset - sw, r);
-        g.lineWidth = sw; g.strokeStyle = INK; g.stroke();
-        glyph(S * 0.5);
+        // iOS cuts the icon to its shape itself, so the ink runs to the edge and only the tile is drawn in the shape.
+        g.fillStyle = INK; g.fillRect(0, 0, S, S);
+        tile(); glyph(S * 0.58, S * 0.03);
       } else {
         // Maskable: the launcher cuts its own shape and keeps the middle 80%, so only the glyph, kept well inside.
         g.fillStyle = PAPER; g.fillRect(0, 0, S, S);
-        glyph(S * 0.38);
+        glyph(S * 0.38, S * 0.02);
       }
       const url = c.toDataURL("image/png"); urls[spec.name] = url;
       const fig = document.createElement("figure");
