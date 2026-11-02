@@ -102,18 +102,20 @@ body {
   gap: 18px;
 }
 
-.install {
+/* Banners at the top of the page: the install hint, and the Update offer when a new version is waiting. */
+.banner {
   display: flex; align-items: center; gap: 12px;
   background: var(--accent); color: var(--accent-ink);
   border-radius: var(--radius); padding: 12px 14px;
 }
-.install-glyph { font-family: "NasinNanpa"; font-size: 30px; line-height: 1; flex: none; }
-.install-text { flex: 1 1 140px; display: grid; gap: 2px; font-size: 0.9rem; line-height: 1.35; }
-.install-text strong { font: 600 1rem/1.2 var(--font-display); }
-.install-text svg { width: 1em; height: 1em; vertical-align: -0.15em; }
-.install-actions { display: flex; align-items: center; gap: 4px; flex: none; margin-left: auto; }
-.install-btn { background: var(--accent-ink); color: var(--accent); border-color: transparent; padding: 9px 14px; font-size: 0.9rem; }
-.install-close { background: transparent; border-color: transparent; color: inherit; padding: 6px 10px; font-size: 1.4rem; line-height: 1; }
+.banner-glyph { font-family: "NasinNanpa"; font-size: 30px; line-height: 1; flex: none; }
+.banner-text { flex: 1 1 140px; display: grid; gap: 2px; font-size: 0.9rem; line-height: 1.35; }
+.banner-text strong { font: 600 1rem/1.2 var(--font-display); }
+.banner-text svg { width: 1em; height: 1em; vertical-align: -0.15em; }
+.banner-actions { display: flex; align-items: center; gap: 4px; flex: none; margin-left: auto; }
+.banner-btn { background: var(--accent-ink); color: var(--accent); border-color: transparent; padding: 9px 14px; font-size: 0.9rem; }
+.banner-btn:disabled { opacity: 0.7; cursor: default; }
+.banner-close { background: transparent; border-color: transparent; color: inherit; padding: 6px 10px; font-size: 1.4rem; line-height: 1; }
 
 /* Top bar: the panel button at the top left, the name beside it. Sticky, and it carries the phone's top inset. */
 .topbar {
@@ -316,15 +318,26 @@ body.shelf-open .shelf { transform: none; visibility: visible; transition: trans
   <button type="button" class="icon-btn theme-btn" id="theme-btn" aria-label="Switch to dark mode" title="Dark mode"><svg class="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg><svg class="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.5 1.5M17.2 17.2l1.5 1.5M5.3 18.7l1.5-1.5M17.2 6.8l1.5-1.5"/></svg></button>
 </nav>
 <main class="wrap">
-  <aside class="install" id="install" hidden>
-    <div class="install-glyph" aria-hidden="true">kama</div>
-    <div class="install-text">
+  <aside class="banner" id="update" hidden>
+    <div class="banner-glyph" aria-hidden="true">sin</div>
+    <div class="banner-text">
+      <strong>Update available</strong>
+      <span>A new version of ilo sitelen is ready. Your message is kept.</span>
+    </div>
+    <div class="banner-actions">
+      <button type="button" class="banner-btn" id="update-btn">Update</button>
+      <button type="button" class="banner-close" id="update-close" aria-label="Not now">&times;</button>
+    </div>
+  </aside>
+  <aside class="banner" id="install" hidden>
+    <div class="banner-glyph" aria-hidden="true">kama</div>
+    <div class="banner-text">
       <strong>Install ilo sitelen</strong>
       <span id="install-how">Add it to your home screen to open it like an app, even offline.</span>
     </div>
-    <div class="install-actions">
-      <button type="button" class="install-btn" id="install-btn" hidden>Install</button>
-      <button type="button" class="install-close" id="install-close" aria-label="Dismiss">&times;</button>
+    <div class="banner-actions">
+      <button type="button" class="banner-btn" id="install-btn" hidden>Install</button>
+      <button type="button" class="banner-close" id="install-close" aria-label="Dismiss">&times;</button>
     </div>
   </aside>
   <h1 class="tagline">Type toki pona, get a sitelen pona image for any chat.</h1>
@@ -932,9 +945,60 @@ body.shelf-open .shelf { transform: none; visibility: visible; transition: trans
     });
   })();
 
-  // ---------- offline ----------
+  // ---------- offline, and updates ----------
+  // sw.js serves the app from its cache, so a deploy ships a new sw.js. The browser installs that worker beside
+  // the running one and leaves it waiting; the banner offers it, and the page reloads once it takes over.
+  // The message and settings live in localStorage, so the reload keeps them.
   if ("serviceWorker" in navigator && !window.__IS_ARTIFACT__) {
-    window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js").catch(() => {}));
+    const sw = navigator.serviceWorker;
+    const banner = $("update"), btn = $("update-btn");
+    let waiting = null, asked = false, reloading = false;
+
+    const reload = () => { if (!reloading) { reloading = true; location.reload(); } };
+    const offer = (worker) => {
+      waiting = worker;
+      banner.hidden = false;
+      toast("A new version is ready. Tap Update at the top.");
+    };
+    // A worker is an update once it is installed while another one controls the page; the first install is not.
+    const track = (worker) => {
+      if (!worker) return;
+      worker.addEventListener("statechange", () => { if (worker.state === "installed" && sw.controller) offer(worker); });
+    };
+    const watch = (reg) => {
+      // The browser checks sw.js during the navigation, so a new worker may be installing or waiting already.
+      if (reg.waiting && sw.controller) offer(reg.waiting);
+      track(reg.installing);
+      reg.addEventListener("updatefound", () => track(reg.installing));
+    };
+
+    btn.addEventListener("click", () => {
+      const worker = waiting;
+      if (!worker) return;
+      if (worker.state !== "installed") { reload(); return; } // It took over already, asked from another tab.
+      asked = true;
+      btn.disabled = true;
+      btn.textContent = "Updating\u2026";
+      worker.addEventListener("statechange", () => {
+        if (worker.state === "activated") reload(); // Belt and braces, should controllerchange not arrive.
+        if (worker.state === "redundant") { // Superseded or failed: put the button back, and the banner away unless a newer worker took its place.
+          asked = false; btn.disabled = false; btn.textContent = "Update";
+          if (waiting === worker) banner.hidden = true;
+        }
+      });
+      worker.postMessage({ type: "SKIP_WAITING" });
+    });
+    $("update-close").addEventListener("click", () => { banner.hidden = true; });
+    sw.addEventListener("controllerchange", () => { if (asked) reload(); });
+
+    window.addEventListener("load", () => {
+      sw.register("./sw.js").then((reg) => {
+        watch(reg);
+        // An installed app can stay open for days: look for a new version when it comes to the front, and hourly.
+        document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") reg.update().catch(() => {}); });
+        setInterval(() => reg.update().catch(() => {}), 60 * 60 * 1000);
+      }).catch(() => {});
+    });
   }
 })();
 </script>
