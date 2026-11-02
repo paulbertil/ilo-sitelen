@@ -457,12 +457,12 @@ body.shelf-open .shelf { transform: none; visibility: visible; transition: trans
 
   const state = {
     size: store.get("size", "s"),
-    style: store.get("style", "night"),
+    style: store.get("style", null), // a tapped swatch; null means the image follows the app's light or dark, picked below
     names: store.get("names", "1") === "1",
     sentences: store.get("sentences", "1") === "1",
   };
   if (!SIZES[state.size]) state.size = "s";
-  if (!STYLES.some((s) => s.id === state.style)) state.style = "night";
+  if (!STYLES.some((s) => s.id === state.style)) state.style = null;
   const savedText = store.get("text", null);
   if (savedText !== null) textEl.value = savedText;
 
@@ -550,6 +550,7 @@ body.shelf-open .shelf { transform: none; visibility: visible; transition: trans
   }
 
   let currentBlob = null, currentUrl = null, renderPromise = null;
+  let fontsReady = false;
 
   // Text → lines of segments, shaped by the names and sentences settings. `unknown` collects words drawn as plain letters.
   function parseText(text, opts, unknown = new Set()) {
@@ -681,9 +682,24 @@ body.shelf-open .shelf { transform: none; visibility: visible; transition: trans
   function syncStyle() {
     for (const b of styleGroup.children) b.setAttribute("aria-pressed", String(b.dataset.v === state.style));
   }
+  // Without a tapped swatch the image follows the app: Dark while the app is dark, White while it is light. Tapping the
+  // swatch the app would pick anyway clears the choice, like the theme button does, so the image follows the app again.
+  let styleChosen = state.style !== null;
+  const themeStyle = () => (isDark() ? "night" : "paper");
+  function setStyle(id) {
+    state.style = id;
+    styleChosen = id !== themeStyle();
+    if (styleChosen) store.set("style", id); else store.remove("style");
+    syncStyle();
+  }
+  function followTheme() {
+    if (styleChosen || state.style === themeStyle()) return;
+    state.style = themeStyle(); syncStyle();
+    if (fontsReady) render();
+  }
   styleGroup.addEventListener("click", (e) => {
     const b = e.target.closest("button"); if (!b) return;
-    state.style = b.dataset.v; store.set("style", state.style); syncStyle(); render();
+    setStyle(b.dataset.v); render();
   });
 
   const namesEl = $("names");
@@ -709,6 +725,7 @@ body.shelf-open .shelf { transform: none; visibility: visible; transition: trans
     themeBtn.title = dark ? "Light mode" : "Dark mode";
     const bg = getComputedStyle(document.documentElement).getPropertyValue("--bg").trim();
     for (const [m, orig] of themeMetas) m.content = chosen ? bg : orig;
+    followTheme();
   }
   themeBtn.addEventListener("click", () => {
     const next = isDark() ? "light" : "dark";
@@ -720,7 +737,6 @@ body.shelf-open .shelf { transform: none; visibility: visible; transition: trans
   syncTheme();
 
   syncSize(); syncStyle();
-  let fontsReady = false;
   function boot() { fontsReady = true; render(); renderShelf(); }
   document.fonts.load(`64px ${FONT}`, "toki").then(boot, boot);
 
@@ -854,10 +870,11 @@ body.shelf-open .shelf { transform: none; visibility: visible; transition: trans
   function openRecent(r) {
     const o = settingsOf(r);
     textEl.value = r.text; store.set("text", r.text);
-    state.size = o.size; state.style = o.style; state.names = o.names; state.sentences = o.sentences;
-    store.set("size", state.size); store.set("style", state.style);
+    state.size = o.size; state.names = o.names; state.sentences = o.sentences;
+    store.set("size", state.size);
     store.set("names", state.names ? "1" : "0"); store.set("sentences", state.sentences ? "1" : "0");
-    syncSize(); syncStyle(); namesEl.checked = state.names; sentencesEl.checked = state.sentences;
+    setStyle(o.style);
+    syncSize(); namesEl.checked = state.names; sentencesEl.checked = state.sentences;
     render(); syncActive();
     if (!wide.matches) setShelf(false);
   }
