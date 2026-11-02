@@ -3,29 +3,30 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>og.png for ilo sitelen</title>
+<title>og-2.png for ilo sitelen</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Quicksand:wght@700&display=swap">
 <style>
-  body { margin: 0; padding: 24px; font: 16px/1.5 system-ui, sans-serif; background: #f3f6f5; color: #16201e; }
-  canvas { display: block; max-width: 100%; height: auto; box-shadow: 0 1px 0 #d9e2df, 0 12px 32px rgba(0, 0, 0, 0.12); border-radius: 10px; }
+  body { margin: 0; padding: 24px; font: 16px/1.5 system-ui, sans-serif; background: #f5ecd7; color: #121110; }
+  canvas { display: block; max-width: 100%; height: auto; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.14); border-radius: 10px; }
   p { max-width: 70ch; }
   output { display: none; }
 </style>
 </head>
 <body>
 <!--
-  Draws og.png, the 1200 by 630 link card decided on https://github.com/paulbertil/ilo-sitelen/issues/12:
-  what the app draws for "toki! mi jan Ali. sina pona ala pona?" on the dark output style, signed with the mark and the name.
+  Draws og-2.png, the 1200 by 630 link card decided on https://github.com/paulbertil/ilo-sitelen/issues/12:
+  what the app draws for "toki! mi jan Ali. sina pona ala pona?", in the app's own look: ink glyphs on a cream sheet with an
+  ink outline, the mark and the name sitting on the top border the way every box in the app carries its name.
   The sitelen pona font is read out of ../index.html so it stays single-sourced. fetch() does not work over file://, so run
   from the repo root with `python3 -m http.server` and open http://localhost:8000/scripts/og.html, then save the PNG.
-  Rerun it whenever the sample or the style changes, and give the file a new name (og-2.png) so chat apps drop their cached copy.
+  Rerun it whenever the sample or the look changes, and give the file a new name (og-3.png) so chat apps drop their cached copy.
   scripts/ is excluded from the deployment by .vercelignore.
 -->
-<h1>og.png</h1>
+<h1>og-2.png</h1>
 <p id="status">Drawing…</p>
 <canvas id="card" width="1200" height="630"></canvas>
-<p><a id="save" download="og.png" hidden>Save og.png</a></p>
+<p><a id="save" download="og-2.png" hidden>Save og-2.png</a></p>
 <output id="png"></output>
 <script>
 (async () => {
@@ -37,19 +38,20 @@
     if (!m) throw new Error("NasinNanpa data URI not found in ../index.html");
     const nasin = new FontFace("NasinNanpa", `url(${m[1]})`);
     document.fonts.add(await nasin.load());
-    await document.fonts.load("600 40px Fredoka");
+    await document.fonts.load("700 46px Quicksand");
     await document.fonts.ready;
 
-    // The spec, in image pixels.
-    const W = 1200, H = 630, BG = "#1b2120", INK = "#eef3f1", TEAL = "#0e7c74";
-    const GS = 118, GAP = GS * 0.3, SHIFT_UP = 35;
+    // The spec, in image pixels. The app's 3px lines are 6px here: the card is shown at about half its size.
+    const W = 1200, H = 630;
+    const PAPER = "#f5ecd7", SHEET = "#ede1c3", INK = "#121110", BW = 6;
+    const INSET = 44, R = 44;
+    const GS = 118, GAP = GS * 0.3, NUDGE_DOWN = 14;
     const ROWS = [["toki!"], ["mi", "jan", "[alalipuilo]."], ["sina", "pona", "ala", "pona?"]];
-    const GLYPH = `${GS}px NasinNanpa`, MARKGLYPH = "38px NasinNanpa", WORD = "600 40px Fredoka";
+    const GLYPH = `${GS}px NasinNanpa`;
+    const MARK = 64, MARK_R = 18, MARKGLYPH = "40px NasinNanpa", WORD = "700 46px Quicksand", LEGEND_GAP = 18, LEGEND_PAD = 14;
 
     const c = document.getElementById("card");
     const g = c.getContext("2d");
-    g.fillStyle = BG;
-    g.fillRect(0, 0, W, H);
 
     // Baseline for text in a line box of height `box` with line-height 1: half-leading above the font's content area.
     const baseline = (top, box, font, text) => {
@@ -58,12 +60,19 @@
       return top + (box - (mt.fontBoundingBoxAscent + mt.fontBoundingBoxDescent)) / 2 + mt.fontBoundingBoxAscent;
     };
 
-    // Rows: left-aligned, the block centred and shifted up to leave room for the chip.
+    // Paper, and the sheet with its ink outline.
+    g.fillStyle = PAPER;
+    g.fillRect(0, 0, W, H);
+    g.beginPath(); g.roundRect(INSET, INSET, W - 2 * INSET, H - 2 * INSET, R);
+    g.fillStyle = SHEET; g.fill();
+    g.lineWidth = BW; g.strokeStyle = INK; g.stroke();
+
+    // Rows: left-aligned, the block centred on the sheet and nudged down a little under the legend.
     g.font = GLYPH;
     const widths = ROWS.map((row) => row.map((t) => g.measureText(t).width));
     const rowW = widths.map((ws) => ws.reduce((a, b) => a + b, 0) + GAP * (ws.length - 1));
     const blockW = Math.max(...rowW), blockH = ROWS.length * GS + GAP * (ROWS.length - 1);
-    const left = (W - blockW) / 2, top = (H - blockH) / 2 - SHIFT_UP;
+    const left = (W - blockW) / 2, top = (H - blockH) / 2 + NUDGE_DOWN;
     g.fillStyle = INK;
     g.textBaseline = "alphabetic";
     ROWS.forEach((row, i) => {
@@ -76,29 +85,29 @@
       });
     });
 
-    // Chip, bottom right: the mark, then the name.
-    g.font = WORD; g.letterSpacing = "0.4px";
+    // Legend on the top border, left: the mark, then the name. The border breaks behind it.
+    g.font = WORD; g.letterSpacing = "0.5px";
     const wordW = g.measureText("ilo sitelen").width;
-    const MARK = 56, R = 16, CHIPGAP = 16;
-    const chipW = MARK + CHIPGAP + wordW;
-    const chipLeft = W - 56 - chipW, chipTop = H - 44 - MARK;
-    g.fillStyle = TEAL;
-    g.beginPath(); g.roundRect(chipLeft, chipTop, MARK, MARK, R); g.fill();
-    g.fillStyle = "#ffffff";
     g.letterSpacing = "0px";
+    const legendX = INSET + 44, legendW = MARK + LEGEND_GAP + wordW;
+    g.fillStyle = PAPER;
+    g.fillRect(legendX - LEGEND_PAD, INSET - BW / 2 - 0.5, legendW + 2 * LEGEND_PAD, BW + 1);
+    g.beginPath(); g.roundRect(legendX, INSET - MARK / 2, MARK, MARK, MARK_R);
+    g.fillStyle = PAPER; g.fill();
+    g.lineWidth = BW; g.strokeStyle = INK; g.stroke();
+    g.fillStyle = INK;
     g.font = MARKGLYPH;
     const iloW = g.measureText("ilo").width;
-    g.fillText("ilo", chipLeft + (MARK - iloW) / 2, baseline(chipTop + (MARK - 38) / 2, 38, MARKGLYPH, "ilo"));
-    g.fillStyle = INK;
-    g.font = WORD; g.letterSpacing = "0.4px";
-    g.fillText("ilo sitelen", chipLeft + MARK + CHIPGAP, baseline(chipTop + (MARK - 40) / 2, 40, WORD, "ilo sitelen"));
+    g.fillText("ilo", legendX + (MARK - iloW) / 2, baseline(INSET - 20, 40, MARKGLYPH, "ilo"));
+    g.font = WORD; g.letterSpacing = "0.5px";
+    g.fillText("ilo sitelen", legendX + MARK + LEGEND_GAP, baseline(INSET - 23, 46, WORD, "ilo sitelen"));
     g.letterSpacing = "0px";
 
     const url = c.toDataURL("image/png");
     const a = document.getElementById("save");
     a.href = url; a.hidden = false;
     document.getElementById("png").textContent = url;
-    status.textContent = `Done: ${W}×${H}, about ${Math.round((url.length - 22) * 3 / 4 / 1024)} KB. Save it as og.png at the repo root.`;
+    status.textContent = `Done: ${W}×${H}, about ${Math.round((url.length - 22) * 3 / 4 / 1024)} KB. Save it as og-2.png at the repo root.`;
   } catch (e) {
     status.textContent = "Failed: " + e.message;
   }
