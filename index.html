@@ -318,7 +318,7 @@ body.shelf-open .shelf { transform: none; visibility: visible; transition: trans
   <button type="button" class="icon-btn theme-btn" id="theme-btn" aria-label="Switch to dark mode" title="Dark mode"><svg class="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg><svg class="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.5 1.5M17.2 17.2l1.5 1.5M5.3 18.7l1.5-1.5M17.2 6.8l1.5-1.5"/></svg></button>
 </nav>
 <main class="wrap">
-  <aside class="banner" id="update" hidden aria-live="polite">
+  <aside class="banner" id="update" hidden>
     <div class="banner-glyph" aria-hidden="true">sin</div>
     <div class="banner-text">
       <strong>Update available</strong>
@@ -952,32 +952,44 @@ body.shelf-open .shelf { transform: none; visibility: visible; transition: trans
   if ("serviceWorker" in navigator && !window.__IS_ARTIFACT__) {
     const sw = navigator.serviceWorker;
     const banner = $("update"), btn = $("update-btn");
-    let waiting = null, asked = false;
+    let waiting = null, asked = false, reloading = false;
 
-    const offer = (worker) => { waiting = worker; banner.hidden = false; };
+    const reload = () => { if (!reloading) { reloading = true; location.reload(); } };
+    const offer = (worker) => {
+      waiting = worker;
+      banner.hidden = false;
+      toast("A new version is ready. Tap Update at the top.");
+    };
+    // A worker is an update once it is installed while another one controls the page; the first install is not.
+    const track = (worker) => {
+      if (!worker) return;
+      worker.addEventListener("statechange", () => { if (worker.state === "installed" && sw.controller) offer(worker); });
+    };
     const watch = (reg) => {
-      // The browser may have found a new worker during the navigation already; otherwise watch new ones install.
+      // The browser checks sw.js during the navigation, so a new worker may be installing or waiting already.
       if (reg.waiting && sw.controller) offer(reg.waiting);
-      reg.addEventListener("updatefound", () => {
-        const worker = reg.installing;
-        if (!worker) return;
-        worker.addEventListener("statechange", () => {
-          // Without a controller this is the first install, not an update.
-          if (worker.state === "installed" && sw.controller) offer(worker);
-        });
-      });
+      track(reg.installing);
+      reg.addEventListener("updatefound", () => track(reg.installing));
     };
 
     btn.addEventListener("click", () => {
-      if (!waiting) return;
-      if (waiting.state !== "installed") { location.reload(); return; } // Already took over, from another tab.
+      const worker = waiting;
+      if (!worker) return;
+      if (worker.state !== "installed") { reload(); return; } // It took over already, asked from another tab.
       asked = true;
       btn.disabled = true;
       btn.textContent = "Updating\u2026";
-      waiting.postMessage({ type: "SKIP_WAITING" });
+      worker.addEventListener("statechange", () => {
+        if (worker.state === "activated") reload(); // Belt and braces, should controllerchange not arrive.
+        if (worker.state === "redundant") { // Superseded or failed: put the button back, and the banner away unless a newer worker took its place.
+          asked = false; btn.disabled = false; btn.textContent = "Update";
+          if (waiting === worker) banner.hidden = true;
+        }
+      });
+      worker.postMessage({ type: "SKIP_WAITING" });
     });
     $("update-close").addEventListener("click", () => { banner.hidden = true; });
-    sw.addEventListener("controllerchange", () => { if (asked) location.reload(); });
+    sw.addEventListener("controllerchange", () => { if (asked) reload(); });
 
     window.addEventListener("load", () => {
       sw.register("./sw.js").then((reg) => {

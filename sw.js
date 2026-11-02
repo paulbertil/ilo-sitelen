@@ -3,28 +3,30 @@
 // Bump CACHE with every deploy. The changed file is what makes the browser install this worker again,
 // and the page shows its Update banner once the new worker is installed and waiting.
 const CACHE = "ilo-sitelen-v12";
+const PAGE = new URL("./", self.location.href).href;
 const SHELL = [
-  "./",
-  "./index.html",
+  PAGE,
   "./manifest.webmanifest",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
   "./icons/icon-maskable-512.png",
   "./icons/apple-touch-icon.png",
-];
+].map((p) => new URL(p, self.location.href).href);
 
 self.addEventListener("install", (event) => {
   // No skipWaiting here: the new worker waits until the page asks for it from the Update banner,
-  // or until every open page is closed. A running page keeps the worker and cache it started with.
+  // or until every open page is closed. A running page is never switched to a new worker behind its back.
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(SHELL)));
 });
 
 self.addEventListener("activate", (event) => {
-  event.waitUntil(
+  // Old caches go, and the first worker takes the pages that loaded before it existed. Neither step waits on the other.
+  event.waitUntil(Promise.all([
     caches.keys()
       .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
-      .then(() => self.clients.claim())
-  );
+      .catch(() => {}),
+    self.clients.claim(),
+  ]));
 });
 
 // Sent by the page when the user taps Update. Taking over fires controllerchange there, and the page reloads.
@@ -38,19 +40,24 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(req.url);
 
   if (url.origin === self.location.origin) {
-    // App shell: cache first so the app opens at once, refreshed in the background for next time.
-    // A new version ships with a new CACHE name, and the page offers to switch once that worker is installed.
-    // Every navigation, including the start_url with its query, maps onto the one page.
-    const key = req.mode === "navigate" ? "./" : req;
+    // The page and the rest of the shell come from the cache so the app opens at once, with a refresh in the
+    // background for next time. Any navigation to the page (the start_url with its query, or /index.html) maps onto
+    // the one cached copy. A new version ships with a new CACHE name, and the page offers to switch once that worker
+    // is installed. Other same-origin requests (og.png, the sitemap, a 404 route) go to the network as usual.
+    const plain = url.origin + url.pathname;
+    const isPage = req.mode === "navigate" && (plain === PAGE || plain === PAGE + "index.html");
+    if (!isPage && !SHELL.includes(plain)) return;
+    const key = isPage ? PAGE : plain;
     event.respondWith(
       caches.open(CACHE).then((cache) =>
         cache.match(key).then((hit) => {
           const refresh = fetch(req).then((res) => {
-            if (res.ok) cache.put(key, res.clone());
+            if (res.ok) event.waitUntil(cache.put(key, res.clone()).catch(() => {}));
             return res;
           });
-          if (hit) { refresh.catch(() => {}); return hit; }
-          return refresh;
+          if (!hit) return refresh;
+          event.waitUntil(refresh.catch(() => {}));
+          return hit;
         })
       )
     );
@@ -63,7 +70,7 @@ self.addEventListener("fetch", (event) => {
       caches.match(req).then((hit) => {
         const refresh = fetch(req)
           .then((res) => {
-            if (res.ok) caches.open(CACHE).then((cache) => cache.put(req, res.clone()));
+            if (res.ok) event.waitUntil(caches.open(CACHE).then((cache) => cache.put(req, res.clone())).catch(() => {}));
             return res;
           })
           .catch(() => hit);
