@@ -66,6 +66,7 @@ try { const t = localStorage.getItem("ilo-sitelen:theme"); if (t === "light" || 
   --font-body: "Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", sans-serif;
   --radius: 14px;
   --shelf-w: 340px;
+  --sheet-w: 400px;
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
@@ -143,6 +144,11 @@ label.lbl {
   text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted);
   margin-bottom: 6px;
 }
+/* The label row above the box carries the cheat sheet opener at its right end: the sona glyph (knowledge), in the same
+   glyph box as the theme toggle. The button's padding is folded into negative margins so the row stays as tall as the label. */
+.lbl-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 6px; }
+.lbl-row .lbl { margin-bottom: 0; }
+.icon-btn.book-btn { padding: 6px; margin: -6px 0; }
 textarea {
   width: 100%; min-height: 104px; resize: vertical;
   font: 1.05rem/1.45 var(--font-body); color: var(--fg);
@@ -157,6 +163,9 @@ textarea:focus-visible { outline: none; border-color: var(--accent); box-shadow:
   border-radius: 10px; padding: 8px 12px; font-size: 0.88rem; margin-top: 8px;
 }
 .unknown b { font-weight: 700; }
+/* The "Check the cheat sheet." link at the end of that line: a button styled as a link, so it opens the sheet in place. */
+.linkbtn { display: inline; font: inherit; font-weight: 700; color: inherit; background: none; border: 0; padding: 0; border-radius: 3px; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.linkbtn:active { transform: none; }
 
 .stage {
   position: relative;
@@ -298,10 +307,67 @@ body.shelf-open .shelf { transform: none; visibility: visible; transition: trans
 .card-act.danger { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 45%, transparent); }
 .s-foot { margin: 0; border-top: 1.5px solid var(--line); padding: 10px 16px; font-size: 0.78rem; color: var(--muted); }
 @media (min-width: 900px) {
-  body { transition: padding-left .22s ease; }
+  body { transition: padding-left .22s ease, padding-right .22s ease; }
   body.shelf-open { padding-left: var(--shelf-w); }
   body.shelf-open .scrim { display: none; }
   body.shelf-open .toast { left: calc(50% + var(--shelf-w) / 2); }
+}
+
+/* ---- Cheat sheet: every word the app draws, as a tappable glyph tile, opened from the book icon above the box. A bottom
+   sheet on a phone; at 900px and up a column on the right, like the Recents shelf, with no scrim so the box stays usable. ---- */
+.sheet-scrim { position: fixed; inset: 0; background: rgb(0 0 0 / 0.38); z-index: 45; }
+.sheet {
+  position: fixed; left: 0; right: 0; bottom: 0; height: 86vh; height: 86dvh; z-index: 50;
+  background: var(--bg); border-top: 1.5px solid var(--line); border-radius: 18px 18px 0 0;
+  display: flex; flex-direction: column; box-shadow: 0 -8px 30px rgb(0 0 0 / 0.2);
+  padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-area-inset-right, 0px);
+}
+.sheet-head { padding: 8px 14px 10px; border-bottom: 1.5px solid var(--line); display: grid; gap: 10px; }
+.sheet-grip { width: 38px; height: 4px; border-radius: 2px; background: var(--line); margin: 0 auto; }
+.sheet-bar { display: flex; align-items: center; gap: 8px; }
+.sheet-bar > div { flex: 1; min-width: 0; }
+.sheet-bar h2 { margin: 0; font: 600 1.15rem/1 var(--font-display); }
+.sheet-bar .btn { padding: 8px 14px; font-size: 0.9rem; flex: none; }
+.sheet-q { width: 100%; font: 1rem/1.3 var(--font-body); color: var(--fg); background: var(--surface); border: 1.5px solid var(--line); border-radius: 10px; padding: 8px 12px; -webkit-appearance: none; appearance: none; }
+.sheet-q:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent); }
+/* The message so far, phone only: the render scaled to the strip, scrolled to its end. */
+.sheet-preview { overflow-x: auto; scrollbar-width: none; border-radius: 8px; }
+.sheet-preview::-webkit-scrollbar { display: none; }
+.sheet-preview img { display: block; height: 44px; width: auto; max-width: none; border-radius: 8px; box-shadow: 0 1px 2px rgb(0 0 0 / 0.18); }
+.sheet-body { flex: 1; overflow-y: auto; padding: 0 14px 12px; overscroll-behavior: contain; }
+.wg { padding-top: 8px; }
+.wg h3 { position: sticky; top: 0; z-index: 1; margin: 0 0 6px; padding: 8px 0 5px; background: var(--bg); font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+.wg.fn h3 { color: var(--accent); }
+.wg-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: 6px; }
+.wt {
+  display: grid; gap: 2px; justify-items: center; align-content: start;
+  padding: 8px 4px 6px; border-radius: 10px; border: 1.5px solid var(--line); background: var(--surface);
+  font: inherit; color: var(--fg); min-width: 0; cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+button.wt:hover { border-color: var(--accent); }
+.wt.flash { background: color-mix(in srgb, var(--accent) 20%, var(--surface)); border-color: var(--accent); }
+.wt-g { font-family: "NasinNanpa"; font-size: 30px; line-height: 1; white-space: nowrap; }
+.wt-w { font-size: 0.8rem; font-weight: 600; line-height: 1.1; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wt-w b { color: var(--accent); }
+.wt-m { font-size: 0.68rem; line-height: 1.15; color: var(--muted); text-align: center; max-width: 100%; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.wt.alt { border-style: dashed; }
+.wt.mk { grid-column: span 2; }
+.wt.ro { cursor: default; }
+.sheet-empty { color: var(--muted); font-size: 0.9rem; padding: 18px 0; margin: 0; }
+.sheet-foot { margin: 0; padding: 8px 14px calc(10px + env(safe-area-inset-bottom, 0px)); border-top: 1.5px solid var(--line); font-size: 0.72rem; line-height: 1.35; color: var(--muted); }
+@media (min-width: 900px) {
+  .sheet {
+    left: auto; right: 0; top: 0; bottom: 0; height: auto; width: min(var(--sheet-w), 92vw);
+    border-radius: 0; border-top: 0; border-left: 1.5px solid var(--line); box-shadow: none;
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+  .sheet-grip, .sheet-preview { display: none; }
+  .sheet-head { padding-top: 14px; }
+  .wg-grid { grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); }
+  body.sheet-open { padding-right: var(--sheet-w); }
+  body.sheet-open .sheet-scrim { display: none; }
+  body.sheet-open .toast { left: calc(50% - var(--sheet-w) / 2); }
+  body.shelf-open.sheet-open .toast { left: calc(50% + (var(--shelf-w) - var(--sheet-w)) / 2); }
 }
 
 .toast {
@@ -310,7 +376,7 @@ body.shelf-open .shelf { transform: none; visibility: visible; transition: trans
   background: var(--fg); color: var(--bg);
   padding: 11px 18px; border-radius: 999px; font-size: 0.92rem; font-weight: 600;
   max-width: calc(100% - 32px); text-align: center;
-  transition: opacity .2s, transform .2s; pointer-events: none; z-index: 40;
+  transition: opacity .2s, transform .2s; pointer-events: none; z-index: 60; /* above the cheat sheet */
 }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 @media (prefers-reduced-motion: reduce) { .toast, .shelf, body { transition: none; } button:active { transform: none; } }
@@ -348,7 +414,10 @@ body.shelf-open .shelf { transform: none; visibility: visible; transition: trans
   <h1 class="tagline">Type toki pona, get a sitelen pona image for any chat.</h1>
 
   <section>
-    <label class="lbl" for="text">Your message</label>
+    <div class="lbl-row">
+      <label class="lbl" for="text">Your message</label>
+      <button type="button" class="icon-btn book-btn" id="book-btn" aria-label="Open the cheat sheet" title="Cheat sheet" aria-expanded="false" aria-controls="sheet"><span class="theme-glyph" aria-hidden="true">sona</span></button>
+    </div>
     <textarea id="text" autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="toki! mi jan Mali."></textarea>
     <div class="unknown" id="unknown" hidden></div>
   </section>
@@ -421,6 +490,21 @@ body.shelf-open .shelf { transform: none; visibility: visible; transition: trans
   <div class="s-list" id="s-list"></div>
   <p class="s-foot" id="s-foot">Saved on this device only.</p>
 </aside>
+<div class="sheet-scrim" id="sheet-scrim" hidden></div>
+<section class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title" hidden>
+  <div class="sheet-head">
+    <div class="sheet-grip" aria-hidden="true"></div>
+    <div class="sheet-bar">
+      <div><h2 id="sheet-title">Cheat sheet</h2><p class="sub">Tap a word to add it to your message.</p></div>
+      <button type="button" class="btn" id="sheet-undo" hidden>Undo</button>
+      <button type="button" class="btn" id="sheet-done">Done</button>
+    </div>
+    <input type="search" class="sheet-q" id="sheet-q" placeholder="Search a word or a meaning" aria-label="Search the cheat sheet" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+    <div class="sheet-preview" id="sheet-preview"><img id="sheet-img" alt="Your message so far"></div>
+  </div>
+  <div class="sheet-body" id="sheet-body"></div>
+  <p class="sheet-foot">Word meanings follow Sonja Lang's public-domain dictionary in Toki Pona: The Language of Good (2014) and her word data at tokipona.org/nimi_pu.txt and tokipona.org/nimi_pi_pu_ala.txt. Which words count as rare follows lipu Linku's 2026 word survey (linku.la).</p>
+</section>
 <div class="scrim" id="scrim" hidden></div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
@@ -453,6 +537,8 @@ body.shelf-open .shelf { transform: none; visibility: visible; transition: trans
   const textEl = $("text"), outEl = $("out"), unknownEl = $("unknown"), toastEl = $("toast");
   const copyBtn = $("copy"), shareBtn = $("share"), saveLink = $("save");
   const recentsBtn = $("recents-btn"), shelfList = $("s-list"), scrimEl = $("scrim");
+  // The "Check the cheat sheet." link in the Not toki pona line; render() needs it from the first paint.
+  const sheetLink = el("button", { class: "linkbtn", type: "button", onclick: () => setSheet(true) }, "cheat sheet");
 
   const store = {
     get(k, d) { try { const v = localStorage.getItem("ilo-sitelen:" + k); return v == null ? d : v; } catch { return d; } },
@@ -605,10 +691,9 @@ body.shelf-open .shelf { transform: none; visibility: visible; transition: trans
     const c = paint(textEl.value, state, unknown);
 
     if (unknown.size) {
-      unknownEl.innerHTML = "";
       const b = document.createElement("b");
       b.textContent = [...unknown].join(", ");
-      unknownEl.append("Not toki pona, shown as plain letters: ", b);
+      unknownEl.replaceChildren("Not toki pona, shown as plain letters: ", b, ". Check the ", sheetLink, ".");
       unknownEl.hidden = false;
     } else unknownEl.hidden = true;
 
@@ -715,7 +800,14 @@ body.shelf-open .shelf { transform: none; visibility: visible; transition: trans
   sentencesEl.checked = state.sentences;
   sentencesEl.addEventListener("change", () => { state.sentences = sentencesEl.checked; store.set("sentences", state.sentences ? "1" : "0"); render(); });
 
-  textEl.addEventListener("input", () => { store.set("text", textEl.value); scheduleRender(); syncActive(); });
+  // The caret or selection the box last had, so a tapped cheat sheet tile lands there. Null until the user places one,
+  // and again once Recents or New swaps the text; a tap then appends at the end. Registered before the input handler
+  // below, so the sheet reads the selection after a keystroke, not the one before it.
+  let lastSel = null;
+  const remember = () => { lastSel = [textEl.selectionStart, textEl.selectionEnd]; };
+  for (const ev of ["keyup", "click", "select", "input", "blur"]) textEl.addEventListener(ev, remember);
+
+  textEl.addEventListener("input", () => { store.set("text", textEl.value); scheduleRender(); syncActive(); textChanged(); });
 
   // ---------- light or dark ----------
   // The app follows the device until the toggle is used. A choice is kept, and the script in <head> applies it before the
@@ -874,7 +966,7 @@ body.shelf-open .shelf { transform: none; visibility: visible; transition: trans
 
   function openRecent(r) {
     const o = settingsOf(r);
-    textEl.value = r.text; store.set("text", r.text);
+    textEl.value = r.text; store.set("text", r.text); lastSel = null; textChanged();
     state.size = o.size; state.names = o.names; state.sentences = o.sentences;
     store.set("size", state.size);
     store.set("names", state.names ? "1" : "0"); store.set("sentences", state.sentences ? "1" : "0");
@@ -891,7 +983,7 @@ body.shelf-open .shelf { transform: none; visibility: visible; transition: trans
     toast("Removed from Recents.");
   }
   function newMessage() {
-    textEl.value = ""; store.set("text", "");
+    textEl.value = ""; store.set("text", ""); lastSel = null; textChanged();
     render(); syncActive();
     if (!wide.matches) setShelf(false);
     textEl.focus();
@@ -919,15 +1011,206 @@ body.shelf-open .shelf { transform: none; visibility: visible; transition: trans
     if (!open) pendingDelete = null;
     if (open) renderShelf();
   }
-  const wantsShelf = () => wide.matches;
+  // Wide: the shelf is a column that is always open, except that the shelf, the app and the cheat sheet fit side by side
+  // only from about 1280px; below that the shelf tucks away while the sheet is open and comes back when it closes.
+  let sheetOpen = false;
+  const roomy = matchMedia("(min-width: 1280px)");
+  const wantsShelf = () => wide.matches && !(sheetOpen && !roomy.matches);
+  const syncShelf = () => { if (wide.matches && shelfOpen !== wantsShelf()) setShelf(wantsShelf()); };
   recentsBtn.addEventListener("click", () => { setShelf(true); if (!wide.matches) $("s-close").focus(); });
   $("s-close").addEventListener("click", () => { setShelf(false); recentsBtn.focus(); });
   $("s-new").addEventListener("click", newMessage);
   scrimEl.addEventListener("click", () => setShelf(false));
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && shelfOpen && !wide.matches) { setShelf(false); recentsBtn.focus(); } });
-  wide.addEventListener("change", () => setShelf(wantsShelf()));
+  wide.addEventListener("change", () => { setShelf(wantsShelf()); syncSheetMode(); });
+  roomy.addEventListener("change", syncShelf);
   if (iOS && !standalone) $("s-foot").textContent = "Saved on this phone only. They last longest when the app is on your Home Screen.";
   setShelf(wantsShelf());
+
+  // ---------- cheat sheet: every word the app draws, as a tappable glyph tile ----------
+  // Groups, order and glosses are hand-curated, not derived from WORDS at run time: five function groups, ten themes,
+  // Rare, then the app's own marks. A word with an everyday meaning repeats in a theme group with that sense; a word
+  // with a second glyph in nasin nanpa gets a dashed tile with the exact text to type. Meanings follow Sonja Lang's
+  // public-domain dictionary and her word data at tokipona.org (credit line in the sheet's foot and the README).
+  const SHEET = [
+    ["Particles", "fn", [["li", "before the verb"], ["e", "before the object"], ["la", "context, then"], ["pi", "of (groups words)"], ["o", "hey; please, do"], ["en", "and (joins subjects)"], ["anu", "or"], ["ala", "no, not"], ["seme", "what, which"], ["taso", "but; only"], ["a", "ah, oh; emphasis", [["a1", "two stems"], ["a2", "three stems"]]], ["kin", "also, too"], ["n", "hmm, um"], ["nanpa", "number; -th"]]],
+    ["Pronouns", "fn", [["mi", "I, me, we"], ["sina", "you"], ["ona", "he, she, it, they"], ["ni", "this, that", [["ni1", "arrow left"], ["ni2", "arrow up"]]]]],
+    ["Prepositions", "fn", [["lon", "at, in, on"], ["tawa", "to, towards"], ["tan", "from, because of"], ["kepeken", "using, with"], ["sama", "like, same as"]]],
+    ["Before a verb", "fn", [["wile", "want to, need to", [["wile1", "pilin flipped"]]], ["ken", "can, may"], ["kama", "become, get to"], ["awen", "keep on, still"], ["open", "start to"], ["pini", "stop, finish"], ["sona", "know how to"], ["lukin", "try to"]]],
+    ["Numbers", "fn", [["nanpa", "number; -th"], ["ala", "zero"], ["wan", "one"], ["tu", "two"], ["luka", "five"], ["mute", "many; 20", [["mute1", "four hands"]]], ["ale", "all; 100"]]],
+    ["People", "th", [["jan", "person"], ["meli", "woman", [["meli1", "venus sign"]]], ["mije", "man", [["mije1", "mars sign"]]], ["tonsi", "nonbinary, trans"], ["mama", "parent"], ["kulupu", "group, community"]]],
+    ["Body", "th", [["sijelo", "body"], ["lawa", "head, mind; lead"], ["lukin", "eye; see, look"], ["kute", "ear; hear"], ["uta", "mouth", [["uta1", "no dot"]]], ["nena", "nose, bump, hill"], ["luka", "hand, arm"], ["noka", "leg, foot"], ["pilin", "heart; feel"], ["selo", "skin, shell"], ["sinpin", "front, face"], ["monsi", "back, behind"]]],
+    ["Animals and plants", "th", [["soweli", "animal"], ["waso", "bird"], ["kala", "fish", [["kala1", "with eyes"]]], ["akesi", "reptile, frog", [["akesi1", "six legs"]]], ["pipi", "bug, insect"], ["kijetesantakalu", "raccoon"], ["mu", "animal sound", [["mu1", "sideways"]]], ["kasi", "plant"], ["soko", "mushroom"]]],
+    ["World", "th", [["ma", "land, country"], ["telo", "water, liquid"], ["kon", "air, spirit"], ["seli", "fire, hot"], ["suno", "sun, light"], ["mun", "moon, star"], ["ko", "paste, clay"], ["kiwen", "stone, hard thing"], ["tenpo", "time", [["tenpo1", "hourglass"]]]]],
+    ["Places", "th", [["tomo", "house, room"], ["lupa", "door, hole"], ["supa", "table, surface"], ["insa", "inside"], ["sewi", "up, above; divine", [["sewi1", "secular form"]]], ["anpa", "down, below"], ["poka", "side, beside"], ["weka", "away; remove"], ["nasin", "way, path"]]],
+    ["Things", "th", [["ijo", "thing"], ["ilo", "tool, device"], ["lipu", "paper, book"], ["sitelen", "picture, writing"], ["nimi", "name, word"], ["poki", "box, container"], ["len", "cloth, clothes"], ["palisa", "stick, rod"], ["linja", "line, rope, hair"], ["sike", "circle, ball"], ["leko", "square, block"], ["mani", "money"], ["esun", "shop, trade"], ["misikeke", "medicine", [["misikeke1", "mortar, pestle"]]]]],
+    ["Food", "th", [["moku", "eat; food"], ["kili", "fruit, vegetable"], ["pan", "bread, grain"], ["namako", "spice, extra", [["namako1", "crosshairs"]]]]],
+    ["Colours", "th", [["kule", "colour"], ["loje", "red"], ["jelo", "yellow"], ["laso", "blue, green"], ["walo", "white"], ["pimeja", "black, dark"]]],
+    ["Qualities", "th", [["pona", "good"], ["ike", "bad"], ["suli", "big, important"], ["lili", "small, little"], ["mute", "many, much; very", [["mute1", "four hands"]]], ["ale", "all, every"], ["sama", "same, similar"], ["ante", "different, other"], ["sin", "new"], ["wawa", "strong"], ["lon", "real, true"], ["nasa", "strange, silly"], ["jaki", "dirty, gross"], ["suwi", "sweet, cute"], ["lete", "cold"], ["musi", "fun, play"], ["moli", "dead, death"], ["pakala", "broken, mistake"], ["monsuta", "scary, fear"]]],
+    ["Actions", "th", [["toki", "speak, talk; language"], ["pali", "do, make, work"], ["pana", "give, send", [["pana1", "rays only"]]], ["jo", "have, hold"], ["wile", "want, need", [["wile1", "pilin flipped"]]], ["sona", "know; knowledge"], ["olin", "love", [["olin1", "with rays"]]], ["tawa", "go, move"], ["kama", "come, arrive"], ["awen", "stay, wait; keep"], ["open", "open, start"], ["pini", "end, finish"], ["kepeken", "use"], ["lape", "sleep, rest"], ["utala", "fight"], ["kipisi", "cut, split"], ["alasa", "hunt, search"], ["kalama", "sound, noise"], ["unpa", "sex"]]],
+    ["Rare", "th", [["pu", "the toki pona book"], ["ku", "the toki pona dictionary"], ["lanpan", "take, seize", [["lanpan1", "pana flipped"]]], ["majuna", "old, aged"], ["meso", "medium, average"], ["epiku", "epic, awesome"], ["jasima", "mirror, reflect"], ["oko", "eye"], ["kokosila", "not using toki pona"], ["powe", "fake, pretend"], ["apeja", "shame, guilt"], ["pake", "stop, block"]]],
+  ];
+  // The app's notation: the mark, its meaning, a sample the font draws, and how a tap lands (null: read-only).
+  const MARKS = [
+    ["&", "joins two glyphs", "toki&pona", "glue"],
+    ["-", "stacks two glyphs", "toki-pona", "glue"],
+    ["+", "scales the 2nd glyph", "toki+pona", "glue"],
+    ["[ ]", "cartouche (a name)", "[ilo]", "cartouche"],
+    ["Mali", "capital = name", nameToCartouche("Mali"), null],
+    [". ! ?", "start a new line", "toki. pona!", null],
+  ];
+
+  const sheetEl = $("sheet"), sheetScrim = $("sheet-scrim"), sheetBody = $("sheet-body"), sheetQ = $("sheet-q");
+  const sheetImg = $("sheet-img"), sheetPreview = $("sheet-preview"), bookBtn = $("book-btn"), undoBtn = $("sheet-undo");
+
+  // PLACE-START
+  // Where a tap lands. Pure: the text, the remembered selection and what the tile stands for, to the new text and caret.
+  // A word gets a space before it unless the text before the caret is empty or ends in whitespace, a glue mark or "[",
+  // and a space after unless the next character is whitespace, punctuation or "]". A glue mark snaps to the word before
+  // the caret (or before the end of the selection) with no space after; with no word there it leaves the text alone.
+  // "[ ]" wraps a selection, its outer whitespace kept outside the brackets, else inserts "[]" with the caret inside;
+  // inside brackets it steps out past the "]" and onto a space, closing the cartouche first if the "]" is missing.
+  // Checked by scripts/test-place.mjs, which extracts this block.
+  const inCartouche = (before) => before.lastIndexOf("[") > before.lastIndexOf("]");
+  const spaceBefore = (before) => before && !/[\s&+\-\[]$/.test(before) ? " " : "";
+  const spaceAfter = (after) => /^[\s.,!?:\]]/.test(after) ? "" : " ";
+  function place(v, s, e, ins, kind) {
+    const before = v.slice(0, s), after = v.slice(e);
+    if (kind === "glue") {
+      const b = v.slice(0, e).replace(/\s+$/, "");
+      if (!/[A-Za-z0-9]$/.test(b)) return { value: v, caret: e };
+      return { value: b + ins + after, caret: b.length + ins.length };
+    }
+    if (kind === "cartouche") {
+      if (inCartouche(before)) {
+        const i = after.indexOf("]");
+        if (i < 0) return { value: v.slice(0, e) + "]" + (/^\s/.test(after) ? "" : " ") + after, caret: e + 2 };
+        const pos = e + i + 1, rest = v.slice(pos);
+        if (/^\s/.test(rest)) return { value: v, caret: pos + 1 };
+        return { value: v.slice(0, pos) + " " + rest, caret: pos + 1 };
+      }
+      const sel = v.slice(s, e), core = sel.trim();
+      if (core) {
+        const ws = sel.length - sel.trimStart().length;
+        const b = before + sel.slice(0, ws), a = sel.slice(ws + core.length) + after;
+        const lead = spaceBefore(b), trail = spaceAfter(a);
+        return { value: b + lead + "[" + core + "]" + trail + a, caret: b.length + lead.length + core.length + 2 + trail.length };
+      }
+      const lead = spaceBefore(before), trail = after ? spaceAfter(after) : "";
+      return { value: before + lead + "[]" + trail + after, caret: before.length + lead.length + 1 };
+    }
+    const lead = spaceBefore(before), trail = spaceAfter(after);
+    return { value: before + lead + ins + trail + after, caret: before.length + lead.length + ins.length + trail.length };
+  }
+  // PLACE-END
+
+  let sheetBuilt = false, cartoucheTile = null;
+  let undo = []; // the text before each tap of this opening, newest last; emptied when the text changes under it and on close
+  const selectionNow = () => { const v = textEl.value; return lastSel && lastSel[1] <= v.length ? lastSel : [v.length, v.length]; };
+  const insideCartouche = () => inCartouche(textEl.value.slice(0, selectionNow()[0]));
+  function syncSheet() {
+    if (cartoucheTile) cartoucheTile.querySelector(".wt-w").textContent = insideCartouche() ? "]" : "[ ]";
+    undoBtn.hidden = !undo.length;
+  }
+  // Typing, Recents or New changed the text under the sheet: its taps can no longer be undone, and the cartouche tile
+  // re-reads where the caret is.
+  function textChanged() { undo = []; if (sheetOpen) syncSheet(); }
+  function putText(value, sel) {
+    textEl.value = value; lastSel = sel;
+    store.set("text", value); scheduleRender(); syncActive();
+    // The wide palette hands the caret back to the box after every tap, so typing and tapping alternate.
+    if (wide.matches && sel) { textEl.focus({ preventScroll: true }); textEl.setSelectionRange(sel[0], sel[1]); }
+    syncSheet();
+  }
+  function tap(t, ins, kind) {
+    const v = textEl.value, [s, e] = selectionNow();
+    const r = place(v, s, e, ins, kind);
+    if (kind === "glue" && r.value === v) { toast("Tap a word first: a glue mark joins the word before it."); return; }
+    if (r.value !== v) undo.push({ value: v, sel: lastSel });
+    putText(r.value, [r.caret, r.caret]);
+    t.classList.add("flash"); setTimeout(() => t.classList.remove("flash"), 350);
+    try { navigator.vibrate?.(10); } catch {}
+  }
+  undoBtn.addEventListener("click", () => { const u = undo.pop(); if (u) putText(u.value, u.sel); });
+
+  function wordTile(word, gloss, alt) {
+    const t = el("button", { class: "wt" + (alt ? " alt" : ""), type: "button", title: word + ": " + gloss, onclick: () => tap(t, word, "word") },
+      el("span", { class: "wt-g", "aria-hidden": "true" }, word));
+    const w = el("span", { class: "wt-w" });
+    if (alt) w.append(word.slice(0, -1), el("b", {}, word.slice(-1))); else w.textContent = word;
+    t.append(w, el("span", { class: "wt-m" }, gloss));
+    t.dataset.q = (word + " " + gloss).toLowerCase();
+    return t;
+  }
+  function markTile(mark, gloss, sample, kind) {
+    const t = el(kind ? "button" : "div", { class: "wt mk" + (kind ? "" : " ro"), title: mark + ": " + gloss },
+      el("span", { class: "wt-g", "aria-hidden": "true" }, sample), el("span", { class: "wt-w" }, mark), el("span", { class: "wt-m" }, gloss));
+    if (kind) { t.type = "button"; t.addEventListener("click", () => tap(t, mark, kind)); }
+    if (kind === "cartouche") cartoucheTile = t;
+    t.dataset.q = (mark + " " + gloss).toLowerCase();
+    return t;
+  }
+  function buildSheet() {
+    const frag = document.createDocumentFragment();
+    for (const [name, kind, words] of SHEET) {
+      const grid = el("div", { class: "wg-grid" });
+      for (const [w, g, alts] of words) {
+        grid.append(wordTile(w, g, false));
+        for (const [aw, ag] of alts || []) grid.append(wordTile(aw, ag, true));
+      }
+      frag.append(el("section", { class: "wg " + kind }, el("h3", {}, name), grid));
+    }
+    const marks = el("div", { class: "wg-grid" });
+    for (const [mark, gloss, sample, kind] of MARKS) marks.append(markTile(mark, gloss, sample, kind));
+    frag.append(el("section", { class: "wg" }, el("h3", {}, "Marks"), marks));
+    frag.append(el("p", { class: "sheet-empty", id: "sheet-none", hidden: "" }, "No word matches. Try an English meaning, like “eat”."));
+    sheetBody.append(frag);
+    sheetBuilt = true;
+  }
+  // Search by Latin word or English meaning; a group hides when none of its tiles match.
+  function filterSheet() {
+    const q = sheetQ.value.trim().toLowerCase();
+    let shown = 0;
+    for (const sec of sheetBody.querySelectorAll(".wg")) {
+      let n = 0;
+      for (const t of sec.querySelectorAll(".wt")) { const hit = !q || t.dataset.q.includes(q); t.hidden = !hit; if (hit) n++; }
+      sec.hidden = !n; shown += n;
+    }
+    $("sheet-none").hidden = shown > 0;
+  }
+  sheetQ.addEventListener("input", filterSheet);
+
+  // Phone: a modal bottom sheet behind a scrim. Wide: a palette column with no scrim. The scrim follows a resize.
+  function syncSheetMode() {
+    sheetScrim.hidden = !sheetOpen || wide.matches;
+    sheetEl.setAttribute("aria-modal", String(!wide.matches));
+  }
+  function setSheet(open) {
+    if (open === sheetOpen) { if (open && wide.matches) sheetQ.focus(); return; }
+    if (open && !sheetBuilt) buildSheet();
+    sheetOpen = open;
+    sheetEl.hidden = !open;
+    document.body.classList.toggle("sheet-open", open);
+    bookBtn.setAttribute("aria-expanded", String(open));
+    syncSheetMode(); syncShelf();
+    if (open) {
+      filterSheet(); syncSheet();
+      sheetImg.src = outEl.src; sheetBody.scrollTop = 0;
+      if (wide.matches) sheetQ.focus(); else $("sheet-done").focus();
+    } else {
+      // On a phone the box stays unfocused: no keyboard, the whole image visible. The remembered selection still
+      // places the next tap.
+      undo = []; sheetQ.value = "";
+      bookBtn.focus();
+    }
+  }
+  bookBtn.addEventListener("click", () => setSheet(!sheetOpen));
+  $("sheet-done").addEventListener("click", () => setSheet(false));
+  sheetScrim.addEventListener("click", () => setSheet(false));
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && sheetOpen) { e.preventDefault(); setSheet(false); } });
+  recentsBtn.addEventListener("click", () => { if (sheetOpen && wide.matches && !roomy.matches) setSheet(false); });
+  new MutationObserver(() => { if (sheetOpen) sheetImg.src = outEl.src; }).observe(outEl, { attributes: true, attributeFilter: ["src"] });
+  sheetImg.addEventListener("load", () => { sheetPreview.scrollLeft = sheetPreview.scrollWidth; });
 
   // ---------- install banner ----------
   (function installBanner() {
