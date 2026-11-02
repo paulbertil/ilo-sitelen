@@ -15,6 +15,7 @@ A small installable web app (PWA). No build step, no backend: everything happens
 - Three sizes and two color styles. Settings are remembered between visits.
 - Light or dark: the app follows your device, and the moon or sun button in the top bar flips it. Flip back to what your device shows and it follows the device again.
 - Works offline once installed. An install banner explains how on iOS, Android and desktop.
+- Opens from its cache, so it starts at once. When a new version is out, an Update banner offers it: one tap and the app reloads on the new version, message kept.
 - **Recents** keeps the last 50 messages you copied, shared or saved, as the images you sent them. Open it from the panel button in the header; copy one again, tap it to bring it back into the message box, or remove it. Kept on this device only.
 
 ## Writing tips
@@ -30,7 +31,7 @@ A small installable web app (PWA). No build step, no backend: everything happens
 | --- | --- |
 | `index.html` | The whole app: markup, styles, logic, and the embedded font |
 | `manifest.webmanifest` | PWA manifest (name, icons, standalone display) |
-| `sw.js` | Service worker that caches the app shell for offline use |
+| `sw.js` | Service worker that serves the app shell from cache and hands over to a new version when the user taps Update. Bump `CACHE` with every deploy |
 | `icons/` | App icons, rendered from the font's `ilo` glyph |
 
 ## Run locally
