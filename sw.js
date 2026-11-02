@@ -43,7 +43,7 @@ self.addEventListener("fetch", (event) => {
     // The page and the rest of the shell come from the cache so the app opens at once, with a refresh in the
     // background for next time. Any navigation to the page (the start_url with its query, or /index.html) maps onto
     // the one cached copy. A new version ships with a new CACHE name, and the page offers to switch once that worker
-    // is installed. Other same-origin requests (og.png, the sitemap, a 404 route) go to the network as usual.
+    // is installed. Other same-origin requests (og-2.png, the sitemap, a 404 route) go to the network as usual.
     const plain = url.origin + url.pathname;
     const isPage = req.mode === "navigate" && (plain === PAGE || plain === PAGE + "index.html");
     if (!isPage && !SHELL.includes(plain)) return;
