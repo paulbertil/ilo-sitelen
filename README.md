@@ -34,6 +34,7 @@ A small installable web app (PWA). No build step, no backend: everything happens
 | `manifest.webmanifest` | PWA manifest (name, icons, standalone display) |
 | `sw.js` | Service worker that serves the app shell from cache and hands over to a new version when the user taps Update. Bump `CACHE` with every deploy |
 | `icons/` | App icons, rendered from the font's `ilo` glyph |
+| `scripts/` | `og.html` draws the link card image; `test-place.mjs` checks where a cheat sheet tap lands |
 
 ## Run locally
 
@@ -44,6 +45,12 @@ python3 -m http.server 8765 --bind 127.0.0.1
 ```
 
 Then open http://127.0.0.1:8765/.
+
+The cheat sheet's landing rules (where a tapped word, glue mark or cartouche goes) have a test:
+
+```sh
+node scripts/test-place.mjs
+```
 
 ## Credits
 

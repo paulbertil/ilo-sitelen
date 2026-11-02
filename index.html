@@ -148,7 +148,7 @@ label.lbl {
    glyph box as the theme toggle. The button's padding is folded into negative margins so the row stays as tall as the label. */
 .lbl-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 6px; }
 .lbl-row .lbl { margin-bottom: 0; }
-.book-btn { padding: 6px; margin: -6px 0; }
+.icon-btn.book-btn { padding: 6px; margin: -6px 0; }
 textarea {
   width: 100%; min-height: 104px; resize: vertical;
   font: 1.05rem/1.45 var(--font-body); color: var(--fg);
@@ -328,7 +328,7 @@ body.shelf-open .shelf { transform: none; visibility: visible; transition: trans
 .sheet-bar > div { flex: 1; min-width: 0; }
 .sheet-bar h2 { margin: 0; font: 600 1.15rem/1 var(--font-display); }
 .sheet-bar .btn { padding: 8px 14px; font-size: 0.9rem; flex: none; }
-.sheet-q { width: 100%; font: 1rem/1.3 var(--font-body); color: var(--fg); background: var(--surface); border: 1.5px solid var(--line); border-radius: 10px; padding: 8px 12px; }
+.sheet-q { width: 100%; font: 1rem/1.3 var(--font-body); color: var(--fg); background: var(--surface); border: 1.5px solid var(--line); border-radius: 10px; padding: 8px 12px; -webkit-appearance: none; appearance: none; }
 .sheet-q:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent); }
 /* The message so far, phone only: the render scaled to the strip, scrolled to its end. */
 .sheet-preview { overflow-x: auto; scrollbar-width: none; border-radius: 8px; }
@@ -376,7 +376,7 @@ button.wt:hover { border-color: var(--accent); }
   background: var(--fg); color: var(--bg);
   padding: 11px 18px; border-radius: 999px; font-size: 0.92rem; font-weight: 600;
   max-width: calc(100% - 32px); text-align: center;
-  transition: opacity .2s, transform .2s; pointer-events: none; z-index: 40;
+  transition: opacity .2s, transform .2s; pointer-events: none; z-index: 60; /* above the cheat sheet */
 }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 @media (prefers-reduced-motion: reduce) { .toast, .shelf, body { transition: none; } button:active { transform: none; } }
@@ -537,6 +537,8 @@ button.wt:hover { border-color: var(--accent); }
   const textEl = $("text"), outEl = $("out"), unknownEl = $("unknown"), toastEl = $("toast");
   const copyBtn = $("copy"), shareBtn = $("share"), saveLink = $("save");
   const recentsBtn = $("recents-btn"), shelfList = $("s-list"), scrimEl = $("scrim");
+  // The "Check the cheat sheet." link in the Not toki pona line; render() needs it from the first paint.
+  const sheetLink = el("button", { class: "linkbtn", type: "button", onclick: () => setSheet(true) }, "cheat sheet");
 
   const store = {
     get(k, d) { try { const v = localStorage.getItem("ilo-sitelen:" + k); return v == null ? d : v; } catch { return d; } },
@@ -798,13 +800,14 @@ button.wt:hover { border-color: var(--accent); }
   sentencesEl.checked = state.sentences;
   sentencesEl.addEventListener("change", () => { state.sentences = sentencesEl.checked; store.set("sentences", state.sentences ? "1" : "0"); render(); });
 
-  textEl.addEventListener("input", () => { store.set("text", textEl.value); scheduleRender(); syncActive(); userEdited(); });
-
   // The caret or selection the box last had, so a tapped cheat sheet tile lands there. Null until the user places one,
-  // and again once Recents or New swaps the text; a tap then appends at the end.
+  // and again once Recents or New swaps the text; a tap then appends at the end. Registered before the input handler
+  // below, so the sheet reads the selection after a keystroke, not the one before it.
   let lastSel = null;
   const remember = () => { lastSel = [textEl.selectionStart, textEl.selectionEnd]; };
   for (const ev of ["keyup", "click", "select", "input", "blur"]) textEl.addEventListener(ev, remember);
+
+  textEl.addEventListener("input", () => { store.set("text", textEl.value); scheduleRender(); syncActive(); textChanged(); });
 
   // ---------- light or dark ----------
   // The app follows the device until the toggle is used. A choice is kept, and the script in <head> applies it before the
@@ -963,7 +966,7 @@ button.wt:hover { border-color: var(--accent); }
 
   function openRecent(r) {
     const o = settingsOf(r);
-    textEl.value = r.text; store.set("text", r.text); lastSel = null;
+    textEl.value = r.text; store.set("text", r.text); lastSel = null; textChanged();
     state.size = o.size; state.names = o.names; state.sentences = o.sentences;
     store.set("size", state.size);
     store.set("names", state.names ? "1" : "0"); store.set("sentences", state.sentences ? "1" : "0");
@@ -980,7 +983,7 @@ button.wt:hover { border-color: var(--accent); }
     toast("Removed from Recents.");
   }
   function newMessage() {
-    textEl.value = ""; store.set("text", ""); lastSel = null;
+    textEl.value = ""; store.set("text", ""); lastSel = null; textChanged();
     render(); syncActive();
     if (!wide.matches) setShelf(false);
     textEl.focus();
@@ -1008,13 +1011,19 @@ button.wt:hover { border-color: var(--accent); }
     if (!open) pendingDelete = null;
     if (open) renderShelf();
   }
-  const wantsShelf = () => wide.matches;
+  // Wide: the shelf is a column that is always open, except that the shelf, the app and the cheat sheet fit side by side
+  // only from about 1280px; below that the shelf tucks away while the sheet is open and comes back when it closes.
+  let sheetOpen = false;
+  const roomy = matchMedia("(min-width: 1280px)");
+  const wantsShelf = () => wide.matches && !(sheetOpen && !roomy.matches);
+  const syncShelf = () => { if (wide.matches && shelfOpen !== wantsShelf()) setShelf(wantsShelf()); };
   recentsBtn.addEventListener("click", () => { setShelf(true); if (!wide.matches) $("s-close").focus(); });
   $("s-close").addEventListener("click", () => { setShelf(false); recentsBtn.focus(); });
   $("s-new").addEventListener("click", newMessage);
   scrimEl.addEventListener("click", () => setShelf(false));
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && shelfOpen && !wide.matches) { setShelf(false); recentsBtn.focus(); } });
   wide.addEventListener("change", () => { setShelf(wantsShelf()); syncSheetMode(); });
+  roomy.addEventListener("change", syncShelf);
   if (iOS && !standalone) $("s-foot").textContent = "Saved on this phone only. They last longest when the app is on your Home Screen.";
   setShelf(wantsShelf());
 
@@ -1053,47 +1062,59 @@ button.wt:hover { border-color: var(--accent); }
 
   const sheetEl = $("sheet"), sheetScrim = $("sheet-scrim"), sheetBody = $("sheet-body"), sheetQ = $("sheet-q");
   const sheetImg = $("sheet-img"), sheetPreview = $("sheet-preview"), bookBtn = $("book-btn"), undoBtn = $("sheet-undo");
-  const sheetLink = el("button", { class: "linkbtn", type: "button", onclick: () => setSheet(true) }, "cheat sheet");
 
   // PLACE-START
   // Where a tap lands. Pure: the text, the remembered selection and what the tile stands for, to the new text and caret.
   // A word gets a space before it unless the text before the caret is empty or ends in whitespace, a glue mark or "[",
   // and a space after unless the next character is whitespace, punctuation or "]". A glue mark snaps to the word before
-  // it with no space after. "[ ]" wraps a selection, else inserts "[]" with the caret inside; inside brackets it steps out
-  // past the "]" and onto a space.
+  // the caret (or before the end of the selection) with no space after; with no word there it leaves the text alone.
+  // "[ ]" wraps a selection, its outer whitespace kept outside the brackets, else inserts "[]" with the caret inside;
+  // inside brackets it steps out past the "]" and onto a space, closing the cartouche first if the "]" is missing.
+  // Checked by scripts/test-place.mjs, which extracts this block.
+  const inCartouche = (before) => before.lastIndexOf("[") > before.lastIndexOf("]");
+  const spaceBefore = (before) => before && !/[\s&+\-\[]$/.test(before) ? " " : "";
+  const spaceAfter = (after) => /^[\s.,!?:\]]/.test(after) ? "" : " ";
   function place(v, s, e, ins, kind) {
     const before = v.slice(0, s), after = v.slice(e);
-    const lead = before && !/[\s&+\-\[]$/.test(before) ? " " : "";
     if (kind === "glue") {
-      const b = before.replace(/\s+$/, "");
+      const b = v.slice(0, e).replace(/\s+$/, "");
+      if (!/[A-Za-z0-9]$/.test(b)) return { value: v, caret: e };
       return { value: b + ins + after, caret: b.length + ins.length };
     }
     if (kind === "cartouche") {
-      if (before.lastIndexOf("[") > before.lastIndexOf("]")) {
+      if (inCartouche(before)) {
         const i = after.indexOf("]");
-        if (i < 0) return { value: before + "] " + after, caret: before.length + 2 };
-        const pos = s + i + 1, rest = v.slice(pos);
+        if (i < 0) return { value: v.slice(0, e) + "]" + (/^\s/.test(after) ? "" : " ") + after, caret: e + 2 };
+        const pos = e + i + 1, rest = v.slice(pos);
         if (/^\s/.test(rest)) return { value: v, caret: pos + 1 };
         return { value: v.slice(0, pos) + " " + rest, caret: pos + 1 };
       }
-      if (s !== e) return { value: before + "[" + v.slice(s, e) + "]" + after, caret: e + 2 };
-      const trail = after && !/^[\s.,!?:\]]/.test(after) ? " " : "";
+      const sel = v.slice(s, e), core = sel.trim();
+      if (core) {
+        const ws = sel.length - sel.trimStart().length;
+        const b = before + sel.slice(0, ws), a = sel.slice(ws + core.length) + after;
+        const lead = spaceBefore(b), trail = spaceAfter(a);
+        return { value: b + lead + "[" + core + "]" + trail + a, caret: b.length + lead.length + core.length + 2 + trail.length };
+      }
+      const lead = spaceBefore(before), trail = after ? spaceAfter(after) : "";
       return { value: before + lead + "[]" + trail + after, caret: before.length + lead.length + 1 };
     }
-    const trail = /^[\s.,!?:\]]/.test(after) ? "" : " ";
+    const lead = spaceBefore(before), trail = spaceAfter(after);
     return { value: before + lead + ins + trail + after, caret: before.length + lead.length + ins.length + trail.length };
   }
   // PLACE-END
 
-  let sheetOpen = false, sheetBuilt = false, shelfTucked = false, cartoucheTile = null;
-  let undo = []; // the text before each tap of this opening, newest last; emptied by an edit in the box and on close
+  let sheetBuilt = false, cartoucheTile = null;
+  let undo = []; // the text before each tap of this opening, newest last; emptied when the text changes under it and on close
   const selectionNow = () => { const v = textEl.value; return lastSel && lastSel[1] <= v.length ? lastSel : [v.length, v.length]; };
-  const insideCartouche = () => { const b = textEl.value.slice(0, selectionNow()[0]); return b.lastIndexOf("[") > b.lastIndexOf("]"); };
+  const insideCartouche = () => inCartouche(textEl.value.slice(0, selectionNow()[0]));
   function syncSheet() {
     if (cartoucheTile) cartoucheTile.querySelector(".wt-w").textContent = insideCartouche() ? "]" : "[ ]";
     undoBtn.hidden = !undo.length;
   }
-  function userEdited() { undo = []; if (sheetOpen) syncSheet(); }
+  // Typing, Recents or New changed the text under the sheet: its taps can no longer be undone, and the cartouche tile
+  // re-reads where the caret is.
+  function textChanged() { undo = []; if (sheetOpen) syncSheet(); }
   function putText(value, sel) {
     textEl.value = value; lastSel = sel;
     store.set("text", value); scheduleRender(); syncActive();
@@ -1103,8 +1124,9 @@ button.wt:hover { border-color: var(--accent); }
   }
   function tap(t, ins, kind) {
     const v = textEl.value, [s, e] = selectionNow();
-    undo.push({ value: v, sel: lastSel });
     const r = place(v, s, e, ins, kind);
+    if (kind === "glue" && r.value === v) { toast("Tap a word first: a glue mark joins the word before it."); return; }
+    if (r.value !== v) undo.push({ value: v, sel: lastSel });
     putText(r.value, [r.caret, r.caret]);
     t.classList.add("flash"); setTimeout(() => t.classList.remove("flash"), 350);
     try { navigator.vibrate?.(10); } catch {}
@@ -1163,9 +1185,6 @@ button.wt:hover { border-color: var(--accent); }
     sheetScrim.hidden = !sheetOpen || wide.matches;
     sheetEl.setAttribute("aria-modal", String(!wide.matches));
   }
-  // At 900px and up the shelf, the column and the sheet fit side by side only from about 1280px; below that the shelf
-  // tucks away while the sheet is open and comes back when it closes.
-  const roomForBoth = () => innerWidth >= 1280;
   function setSheet(open) {
     if (open === sheetOpen) { if (open && wide.matches) sheetQ.focus(); return; }
     if (open && !sheetBuilt) buildSheet();
@@ -1173,17 +1192,15 @@ button.wt:hover { border-color: var(--accent); }
     sheetEl.hidden = !open;
     document.body.classList.toggle("sheet-open", open);
     bookBtn.setAttribute("aria-expanded", String(open));
-    syncSheetMode();
+    syncSheetMode(); syncShelf();
     if (open) {
-      if (wide.matches && shelfOpen && !roomForBoth()) { shelfTucked = true; setShelf(false); }
       filterSheet(); syncSheet();
       sheetImg.src = outEl.src; sheetBody.scrollTop = 0;
       if (wide.matches) sheetQ.focus(); else $("sheet-done").focus();
     } else {
-      // The caret goes after the last insertion, but the box is not focused: no keyboard, the whole image visible.
-      if (!wide.matches && lastSel) { try { textEl.setSelectionRange(lastSel[0], lastSel[1]); } catch {} }
+      // On a phone the box stays unfocused: no keyboard, the whole image visible. The remembered selection still
+      // places the next tap.
       undo = []; sheetQ.value = "";
-      if (shelfTucked) { shelfTucked = false; if (wide.matches) setShelf(true); }
       bookBtn.focus();
     }
   }
@@ -1191,7 +1208,7 @@ button.wt:hover { border-color: var(--accent); }
   $("sheet-done").addEventListener("click", () => setSheet(false));
   sheetScrim.addEventListener("click", () => setSheet(false));
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && sheetOpen) { e.preventDefault(); setSheet(false); } });
-  recentsBtn.addEventListener("click", () => { if (sheetOpen && wide.matches && !roomForBoth()) { shelfTucked = false; setSheet(false); } });
+  recentsBtn.addEventListener("click", () => { if (sheetOpen && wide.matches && !roomy.matches) setSheet(false); });
   new MutationObserver(() => { if (sheetOpen) sheetImg.src = outEl.src; }).observe(outEl, { attributes: true, attributeFilter: ["src"] });
   sheetImg.addEventListener("load", () => { sheetPreview.scrollLeft = sheetPreview.scrollWidth; });
 
