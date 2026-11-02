@@ -21,7 +21,10 @@
   Chosen on 2026-11-02 from six candidates compared on mock home screens (frameless paper, ochre with and without the frame,
   the dark-mode mark, and the mark as a sticker on ochre were the others).
   - icon-192.png, icon-512.png: the mark with transparent corners, shown as-is by desktop browsers.
-  - apple-touch-icon.png: full-bleed, ink to the edge and the cream tile inset by the frame width; iOS rounds it itself.
+  - apple-touch-icon.png: the mark at 1024px with a hairline of cream at the very edge. iOS 26 reads the colour at the edge
+    as the background and renders every other shape as a glass layer with bevels and a sheen: with ink at the edge the whole
+    cream tile became a glass slab, and with the glyph alone on cream the glyph went smudgy. The hairline leaves iOS nothing
+    to separate and it draws the icon as it is (nine variants tried on an iPhone on iOS 26, 2026-11-02). iOS cuts its own shape.
   - icon-maskable-512.png: full-bleed cream, the glyph alone inside the safe zone, for Android launchers to shape.
   The sitelen pona font is read out of ../index.html so it stays single-sourced. fetch() does not work over file://, so run
   from the repo root with `python3 -m http.server` and open http://localhost:8000/scripts/icons.html, then save each PNG into icons/.
@@ -75,7 +78,7 @@
     const SPECS = [
       { name: "icon-192.png", size: 192, shape: "mark" },
       { name: "icon-512.png", size: 512, shape: "mark" },
-      { name: "apple-touch-icon.png", size: 180, shape: "apple" },
+      { name: "apple-touch-icon.png", size: 1024, shape: "apple" },
       { name: "icon-maskable-512.png", size: 512, shape: "maskable" },
     ];
     const urls = {};
@@ -100,8 +103,11 @@
         g.fillStyle = INK; g.fill(squircle(0, 0, S, S, S * IOS_R));
         tile(); glyph(S * 0.58, S * 0.03);
       } else if (spec.shape === "apple") {
-        // iOS cuts the icon to its shape itself, so the ink runs to the edge and only the tile is drawn in the shape.
-        g.fillStyle = INK; g.fillRect(0, 0, S, S);
+        // Cream to the edge, the ink in the iOS shape a hairline in from it, then the tile. The hairline is what keeps
+        // iOS 26 from turning the tile into a glass slab (see the note above); its own mask hides most of it.
+        g.fillStyle = PAPER; g.fillRect(0, 0, S, S);
+        const e = S * 0.006;
+        g.fillStyle = INK; g.fill(squircle(e, e, S - 2 * e, S - 2 * e, S * IOS_R - e));
         tile(); glyph(S * 0.58, S * 0.03);
       } else {
         // Maskable: the launcher cuts its own shape and keeps the middle 80%, so only the glyph, kept well inside.
