@@ -1349,7 +1349,7 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
 
   // The mirror follows the box's size (its corner can be dragged) and scroll.
   new ResizeObserver(() => { mirrorEl.style.width = textEl.offsetWidth + "px"; mirrorEl.style.height = textEl.offsetHeight + "px"; }).observe(textEl);
-  textEl.addEventListener("scroll", () => { mirrorEl.scrollTop = textEl.scrollTop; });
+  textEl.addEventListener("scroll", () => { mirrorEl.scrollTop = textEl.scrollTop; if (tapped) showTap(); });
 
   let segs = [], words = [], mirrorText = "", tapped = null; // tapped: the segment's index, and the text it was tapped in
   // After each paint: the segments the preview now shows, the mirror rebuilt around them, and the ring kept or dropped.
@@ -1361,7 +1361,7 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
       if (s.from > i) frag.append(text.slice(i, s.from));
       frag.append(el("span", { class: s.glyph ? "w" : "w plain", "data-i": n }, text.slice(i = s.from, i = s.to)));
     });
-    frag.append(text.slice(i), "​");
+    frag.append(text.slice(i), "\u200b");
     mirrorEl.replaceChildren(frag);
     words = [...mirrorEl.querySelectorAll(".w")];
     mirrorText = text;
@@ -1371,18 +1371,21 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
   }
   // The word at the caret is not wrong yet, only unfinished: its underline, and its place in the notice under the box,
   // wait until the caret leaves it or the box loses focus. selectionchange covers caret moves in current browsers; the
-  // box's own events cover the rest. While the
-  // text is ahead of the mirror (a keystroke lands before the debounced redraw), the marks are left as they are: judged
-  // against the old spans, the caret would seem to have left the word, and it would flash red with every letter.
+  // box's own events cover the rest. While the text is ahead of the mirror (a keystroke lands before the debounced
+  // redraw), the marks are left as they are: judged against the old spans, the caret would seem to have left the word,
+  // and it would flash red with every letter. The notice is rebuilt only when its words change, so its link stays put.
+  let noticed = "";
   function markTyping() {
     if (textEl.value !== mirrorText) return;
     const at = document.activeElement === textEl ? textEl.selectionEnd : -1;
     const typing = (n) => segs[n].from <= at && at <= segs[n].to;
     words.forEach((w, n) => w.classList.toggle("typing", typing(n)));
-    const plain = [...new Set(segs.filter((s, n) => !s.glyph && !typing(n)).map((s) => bare(s.t)))];
-    if (plain.length) {
+    const plain = [...new Set(segs.filter((s, n) => !s.glyph && !typing(n)).map((s) => bare(s.t)))].join(", ");
+    if (plain === noticed) return;
+    noticed = plain;
+    if (plain) {
       const b = document.createElement("b");
-      b.textContent = plain.join(", ");
+      b.textContent = plain;
       unknownEl.replaceChildren("Not toki pona, shown as plain letters: ", b, ". Check the ", sheetLink, ".");
       unknownEl.hidden = false;
     } else unknownEl.hidden = true;
@@ -1419,11 +1422,12 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
     Object.assign(ring.style, { left: (b.x - m) * k + "px", top: (b.y - m) * k + "px", width: (b.w + 2 * m) * k + "px", height: (b.h + 2 * m) * k + "px" });
     if (fresh) { void ring.offsetWidth; ring.style.transition = ""; }
     ring.classList.add("show");
-    // The bubble over the word: the glyph as the image draws it, the word as typed for a name or plain letters.
-    const typed = bare(textEl.value.slice(s.from, s.to).replace(LEAD, ""));
+    // The bubble over the word: the glyph as the image draws it, and the word as it is drawn, or as typed for a name,
+    // a cartouche or plain letters. TRAIL would strip a cartouche's closing bracket, so that one is taken whole.
+    const raw = textEl.value.slice(s.from, s.to), typed = s.t[0] === "[" ? raw : bare(raw.replace(LEAD, ""));
     popEl.replaceChildren(
       ...(s.glyph ? [el("span", { class: "wpop-glyph" }, s.t)] : []),
-      el("span", { class: "wpop-word" }, s.glyph && !s.name ? bare(s.t) || s.t : typed),
+      el("span", { class: "wpop-word" }, s.glyph && !s.name && s.t[0] !== "[" ? bare(s.t) || s.t : typed),
       el("span", { class: "wpop-meaning" }, gloss(s)));
     popEl.className = "wpop show" + (s.t[0] === "[" || !s.glyph ? " wide" : "");
     const r = w.getClientRects()[0], f = fieldEl.getBoundingClientRect();
