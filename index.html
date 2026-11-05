@@ -411,12 +411,27 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
   body.sheet-open .opts { right: var(--sheet-w); }
 }
 
-/* Installed on an iPhone with the black-translucent status bar, bottom: 0 lands that bar's height above the screen's edge
-   (WebKit bug 236445). The script measures the shortfall into --vp-gap, and these pull everything pinned to the bottom
-   down by it. It can never exceed the top inset, so a shrunken viewport, such as with the keyboard open, moves nothing
-   further. Measured rather than assumed, so this goes to zero by itself if iOS fixes the bug. */
-:root { --under: min(var(--vp-gap, 0px), env(safe-area-inset-top, 0px)); }
-.opts, .opts::backdrop, .scrim, .sheet-scrim, .shelf, .sheet { bottom: calc(-1 * var(--under, 0px)); }
+/* Installed on an iPhone with the black-translucent status bar, the viewport ends above the screen's edge (WebKit bug
+   236445; 40pt measured on a 402x874 iPhone), and nothing fixed paints in the strip below it: a scrim moved or shadowed
+   past the edge still stops there. Only the page's background shows in the strip, so while a scrim is up that background
+   takes the scrim's look, and body::before keeps it from dimming twice inside the viewport. The strip is already the
+   sheet's color, so the cheat sheet needs nothing.
+   The script measures the shortfall into --vp-gap for what must sit relative to the real screen: Settings centers on it
+   and the toast keeps its distance from the edge. It can never exceed the top inset, so a shrunken viewport moves nothing
+   further, and it goes to zero by itself if iOS fixes the bug. */
+:root {
+  --under: min(var(--vp-gap, 0px), env(safe-area-inset-top, 0px));
+  --scrim-on-bg: color-mix(in srgb, var(--bg), #000 38%);
+  --shelf-edge: min(var(--shelf-w), 92vw);
+}
+.opts { bottom: calc(-1 * var(--under, 0px)); }
+html:has(.opts[open]) { background: var(--scrim-on-bg); }
+html:has(.scrim:not([hidden])) {
+  background: linear-gradient(to right, var(--bg) calc(var(--shelf-edge) - var(--bw)), var(--line) 0 var(--shelf-edge), var(--scrim-on-bg) 0) var(--scrim-on-bg);
+}
+html:has(.opts[open]) body::before, html:has(.scrim:not([hidden])) body::before {
+  content: ""; position: fixed; inset: 0; z-index: -1; background: var(--bg);
+}
 .vp-debug { margin: 0; padding: 0 16px 12px; font-size: 0.68rem; font-weight: 500; line-height: 1.35; color: var(--muted); } /* TEMPORARY */
 
 .toast {
@@ -877,7 +892,7 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
     measureGap();
     // TEMPORARY: viewport numbers for the iPhone bottom gap.
     const under = getComputedStyle(document.documentElement).getPropertyValue("--under").trim();
-    $("vp-debug").textContent = `v32 · ${installed ? "installed" : "browser"} · screen ${screen.width}x${screen.height} · inner ${innerWidth}x${innerHeight} · fixed bottom ${vpProbe.getBoundingClientRect().bottom} · gap ${vpGap()} · ${under}`;
+    $("vp-debug").textContent = `v33 · ${installed ? "installed" : "browser"} · screen ${screen.width}x${screen.height} · inner ${innerWidth}x${innerHeight} · fixed bottom ${vpProbe.getBoundingClientRect().bottom} · gap ${vpGap()} · ${under}`;
     optsEl.showModal();
   });
   $("opts-done").addEventListener("click", () => optsEl.close());
