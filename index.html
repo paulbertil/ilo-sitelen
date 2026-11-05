@@ -411,6 +411,16 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
   body.sheet-open .opts { right: var(--sheet-w); }
 }
 
+/* Installed on an iPhone, the viewport starts under the status bar but is still that bar's height short of the full
+   screen, so anything pinned to the bottom stops above the screen's edge (62pt on a 402x874 iPhone). The scrims and the
+   panels paint past their own boxes to fill that strip. The shadow draws only outside its box, so nothing dims twice. */
+.opts::backdrop, .scrim, .sheet-scrim { box-shadow: 0 0 0 100vmax rgb(0 0 0 / 0.38); }
+.shelf::after, .sheet::after { content: ""; position: absolute; top: 100%; left: 0; right: 0; height: 100px; background: var(--bg); }
+.shelf::after { right: calc(-1 * var(--bw)); border-right: var(--bw) solid var(--line); }
+@media (min-width: 900px) {
+  .sheet::after { left: calc(-1 * var(--bw)); border-left: var(--bw) solid var(--line); }
+}
+
 .toast {
   position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px));
   transform: translateX(-50%) translateY(20px); opacity: 0;
