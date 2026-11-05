@@ -634,7 +634,7 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
   }
 
   // Each segment keeps where it came from in the text (from, to) and, for a name, the name as typed, for the glyph tap below.
-  function parseLine(line, unknown, names, base = 0) {
+  function parseLine(line, names, base = 0) {
     const segs = [];
     const at = (seg) => { seg.from = base + m.index; seg.to = base + m.index + m[0].length; return seg; };
     const re = /\[[^\]]*\]?|[^\s\[]+/g;
@@ -656,7 +656,6 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
       } else if (names && /^[A-Z][A-Za-z]*$/.test(core) && nameToCartouche(core)) {
         segs.push(at({ t: nameToCartouche(core) + punct, glyph: true, name: core }));
       } else {
-        unknown.add(core);
         segs.push(at({ t: core + punct, glyph: false }));
       }
     }
@@ -706,11 +705,11 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
   let lastPaint = null; // the canvas the preview shows, with its boxes
   let fontsReady = false;
 
-  // Text → lines of segments, shaped by the names and sentences settings. `unknown` collects words drawn as plain letters.
-  function parseText(text, opts, unknown = new Set()) {
+  // Text → lines of segments, shaped by the names and sentences settings.
+  function parseText(text, opts) {
     let base = 0;
     const lines = text.split("\n").flatMap((l) => {
-      const segs = parseLine(l, unknown, opts.names, base);
+      const segs = parseLine(l, opts.names, base);
       base += l.length + 1;
       return opts.sentences ? splitSentences(segs) : [segs];
     });
@@ -720,8 +719,8 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
   }
 
   // Draws one message on a fresh canvas with the given size, style, names and sentences settings.
-  function paint(text, opts, unknown) {
-    const lines = parseText(text, opts, unknown);
+  function paint(text, opts) {
+    const lines = parseText(text, opts);
     const st = STYLES.find((s) => s.id === styleId(opts.style)) || STYLES[0];
     const size = SIZES[opts.size] || SIZES.s;
     const empty = !lines.length;
@@ -754,17 +753,9 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
   }
 
   function render() {
-    const unknown = new Set();
-    const c = paint(textEl.value, state, unknown);
+    const c = paint(textEl.value, state);
     lastPaint = c;
-    syncTap();
-
-    if (unknown.size) {
-      const b = document.createElement("b");
-      b.textContent = [...unknown].join(", ");
-      unknownEl.replaceChildren("Not toki pona, shown as plain letters: ", b, ". Check the ", sheetLink, ".");
-      unknownEl.hidden = false;
-    } else unknownEl.hidden = true;
+    syncTap(); // also sets the "Not toki pona" notice, from the segments, with the word at the caret left out
 
     renderPromise = new Promise((resolve) => c.toBlob((blob) => {
       currentBlob = blob;
@@ -1378,14 +1369,23 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
     showTap();
     markTyping();
   }
-  // The word at the caret is not wrong yet, only unfinished: its underline waits until the caret leaves it or the box
-  // loses focus. selectionchange covers caret moves in current browsers; the box's own events cover the rest. While the
+  // The word at the caret is not wrong yet, only unfinished: its underline, and its place in the notice under the box,
+  // wait until the caret leaves it or the box loses focus. selectionchange covers caret moves in current browsers; the
+  // box's own events cover the rest. While the
   // text is ahead of the mirror (a keystroke lands before the debounced redraw), the marks are left as they are: judged
   // against the old spans, the caret would seem to have left the word, and it would flash red with every letter.
   function markTyping() {
     if (textEl.value !== mirrorText) return;
     const at = document.activeElement === textEl ? textEl.selectionEnd : -1;
-    words.forEach((w, n) => w.classList.toggle("typing", segs[n].from <= at && at <= segs[n].to));
+    const typing = (n) => segs[n].from <= at && at <= segs[n].to;
+    words.forEach((w, n) => w.classList.toggle("typing", typing(n)));
+    const plain = [...new Set(segs.filter((s, n) => !s.glyph && !typing(n)).map((s) => bare(s.t)))];
+    if (plain.length) {
+      const b = document.createElement("b");
+      b.textContent = plain.join(", ");
+      unknownEl.replaceChildren("Not toki pona, shown as plain letters: ", b, ". Check the ", sheetLink, ".");
+      unknownEl.hidden = false;
+    } else unknownEl.hidden = true;
   }
   document.addEventListener("selectionchange", markTyping);
   for (const ev of ["keyup", "click", "focus", "blur"]) textEl.addEventListener(ev, markTyping);
