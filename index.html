@@ -195,6 +195,8 @@ textarea::placeholder { color: var(--muted); opacity: 0.7; }
 .field { isolation: isolate; }
 .mirror { position: absolute; top: 0; left: 0; z-index: -1; overflow: hidden; pointer-events: none; color: transparent; border-color: transparent; white-space: pre-wrap; overflow-wrap: break-word; }
 .mirror .hit { background: rgba(232, 197, 131, 0.28); border-radius: 7px; box-shadow: 0 0 0 3px rgba(232, 197, 131, 0.28), 0 0 0 5px var(--accent); }
+/* A word outside toki pona gets a dashed red underline, except the one still being typed at the caret. */
+.mirror .plain:not(.typing) { text-decoration: underline; text-decoration-style: dashed; text-decoration-color: var(--danger); text-decoration-thickness: 2px; text-underline-offset: 4px; }
 /* The bubble: the glyph big, the word and its meaning beside it; a cartouche is wide, so it goes on top instead. */
 .wpop { position: absolute; z-index: 6; display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 10px; align-items: center; background: var(--bg); color: var(--fg); border: var(--bw) solid var(--line); border-radius: 16px; padding: 8px 14px 8px 10px; max-width: 280px; pointer-events: none; opacity: 0; transition: opacity .12s; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18); }
 .wpop.show { opacity: 1; }
@@ -1335,7 +1337,7 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
   // ---------- tap a glyph: which word is this? ----------
   // A tap on a glyph in the preview rings the glyph, rings its word in the box, and shows a bubble over the word with the
   // glyph, the word and its meaning. They stay until the next tap or an edit; a tap on the ringed glyph again, beside the
-  // glyphs or anywhere else on the page clears them. The
+  // glyphs or anywhere else on the page clears them. The same mirror underlines words outside toki pona in red. The
   // segments know where they came from (parseLine) and where they landed (paint); the ring over the image scales from
   // canvas pixels to the image as shown, and the mirror behind the box, one span per segment, places the word.
   const mirrorEl = $("mirror"), popEl = $("wpop"), ringEl = $("out-ring"), fieldEl = textEl.closest(".field"), topbarEl = document.querySelector(".topbar");
@@ -1366,14 +1368,23 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
     let i = 0;
     segs.forEach((s, n) => {
       if (s.from > i) frag.append(text.slice(i, s.from));
-      frag.append(el("span", { class: "w", "data-i": n }, text.slice(i = s.from, i = s.to)));
+      frag.append(el("span", { class: s.glyph ? "w" : "w plain", "data-i": n }, text.slice(i = s.from, i = s.to)));
     });
     frag.append(text.slice(i), "​");
     mirrorEl.replaceChildren(frag);
     words = [...mirrorEl.querySelectorAll(".w")];
     if (tapped && tapped.text !== text) tapped = null;
     showTap();
+    markTyping();
   }
+  // The word at the caret is not wrong yet, only unfinished: its underline waits until the caret leaves it or the box
+  // loses focus. selectionchange covers caret moves in current browsers; the box's own events cover the rest.
+  function markTyping() {
+    const at = document.activeElement === textEl ? textEl.selectionEnd : -1;
+    words.forEach((w, n) => w.classList.toggle("typing", segs[n].from <= at && at <= segs[n].to));
+  }
+  document.addEventListener("selectionchange", markTyping);
+  for (const ev of ["keyup", "click", "focus", "blur"]) textEl.addEventListener(ev, markTyping);
   outEl.addEventListener("click", (e) => {
     if (!lastPaint || !outEl.naturalWidth) return;
     const r = outEl.getBoundingClientRect(), k = outEl.naturalWidth / outEl.clientWidth;
