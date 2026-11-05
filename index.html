@@ -1360,7 +1360,7 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
   new ResizeObserver(() => { mirrorEl.style.width = textEl.offsetWidth + "px"; mirrorEl.style.height = textEl.offsetHeight + "px"; }).observe(textEl);
   textEl.addEventListener("scroll", () => { mirrorEl.scrollTop = textEl.scrollTop; });
 
-  let segs = [], words = [], tapped = null; // tapped: the segment's index, and the text it was tapped in
+  let segs = [], words = [], mirrorText = "", tapped = null; // tapped: the segment's index, and the text it was tapped in
   // After each paint: the segments the preview now shows, the mirror rebuilt around them, and the ring kept or dropped.
   function syncTap() {
     segs = lastPaint.boxes.map((b) => b.seg);
@@ -1373,13 +1373,17 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
     frag.append(text.slice(i), "​");
     mirrorEl.replaceChildren(frag);
     words = [...mirrorEl.querySelectorAll(".w")];
+    mirrorText = text;
     if (tapped && tapped.text !== text) tapped = null;
     showTap();
     markTyping();
   }
   // The word at the caret is not wrong yet, only unfinished: its underline waits until the caret leaves it or the box
-  // loses focus. selectionchange covers caret moves in current browsers; the box's own events cover the rest.
+  // loses focus. selectionchange covers caret moves in current browsers; the box's own events cover the rest. While the
+  // text is ahead of the mirror (a keystroke lands before the debounced redraw), the marks are left as they are: judged
+  // against the old spans, the caret would seem to have left the word, and it would flash red with every letter.
   function markTyping() {
+    if (textEl.value !== mirrorText) return;
     const at = document.activeElement === textEl ? textEl.selectionEnd : -1;
     words.forEach((w, n) => w.classList.toggle("typing", segs[n].from <= at && at <= segs[n].to));
   }
