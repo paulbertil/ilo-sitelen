@@ -556,7 +556,6 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
     <input type="checkbox" class="switch" id="sentences" checked>
   </label>
 </div>
-<p id="vp-debug" style="margin:0;padding:0 16px 12px;font-size:.68rem;font-weight:500;line-height:1.35;color:var(--muted)"></p><!-- TEMPORARY -->
 </dialog>
 <div class="scrim" id="scrim" hidden></div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
@@ -853,12 +852,7 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
   // it (Escape is the dialog's own cancel), and the dialog hands focus back to the chip. The card fills the dialog, so a
   // tap on the dialog itself is the scrim.
   const optsEl = $("opts"), optsBtn = $("opts-btn");
-  optsBtn.addEventListener("click", () => {
-    optsEl.showModal();
-    // TEMPORARY: viewport numbers for the iPhone bottom gap. The dialog centers in the fixed area, so twice its center is that area's bottom.
-    const box = optsEl.getBoundingClientRect();
-    $("vp-debug").textContent = `v34 · screen ${screen.height} · inner ${innerHeight} · html ${document.documentElement.getBoundingClientRect().height} · body ${document.body.getBoundingClientRect().height} · fixed bottom ${box.top + box.bottom}`;
-  });
+  optsBtn.addEventListener("click", () => optsEl.showModal());
   $("opts-done").addEventListener("click", () => optsEl.close());
   optsEl.addEventListener("click", (e) => { if (e.target === optsEl) optsEl.close(); });
 
