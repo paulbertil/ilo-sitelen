@@ -9,7 +9,8 @@ A small installable web app (PWA). No build step, no backend: everything happens
 - Live preview that redraws as you type.
 - **Copy image** puts a PNG on the clipboard. **Share** and **Save** are also available on the installed app.
 - Capitalized words are treated as names and written in a cartouche, one glyph per sound. `jan Mali` becomes `[mama ala lipu ilo]`.
-- Words outside pu and ku suli are flagged and drawn as plain letters.
+- Words outside pu and ku suli get a dashed red underline in the box (the word still being typed is spared), are listed under it, and are drawn as plain letters.
+- Tap a glyph in the preview to see which word it is: the glyph and its word get the same ochre ring, and a bubble over the word shows the glyph, the word and its meaning. Tap the glyph again, tap anywhere else, or edit the text to clear it.
 - Punctuation follows sitelen pona conventions: `.` becomes the middle dot, `:` the colon glyph, `?` and `!` are kept, commas are dropped.
 - Each sentence starts on its own line, like handwritten sitelen pona. Can be turned off.
 - **Settings** open from the chip at the bottom left of the preview, as a list in a dialog with a line of help per row: three sizes; three color swatches, where Theme, the default, draws the image Dark while the app is dark and White while it is light, and Dark and White stay as they are; and switches for names and lines. Settings are remembered between visits.
