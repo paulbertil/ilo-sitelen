@@ -152,12 +152,13 @@ body {
    (knowledge) in the same glyph box as the theme toggle. The label row only groups the two in the markup. */
 .lbl-row { display: contents; }
 .icon-btn.book-btn { position: absolute; top: -16px; right: 12px; z-index: 1; margin: 0; padding: 6px 8px; background: var(--bg); }
-textarea {
-  width: 100%; min-height: 104px; resize: vertical;
-  font: 600 1.05rem/1.45 var(--font); color: var(--fg);
-  background: transparent; border: var(--bw) solid var(--line);
-  border-radius: var(--radius); padding: 20px 18px 14px;
+/* The box, and a mirror of its text behind it (see "Tap a glyph" below): the same font, padding and wrapping. */
+textarea, .mirror {
+  width: 100%;
+  font: 600 1.05rem/1.45 var(--font);
+  border: var(--bw) solid var(--line); border-radius: var(--radius); padding: 20px 18px 14px;
 }
+textarea { min-height: 104px; resize: vertical; color: var(--fg); background: transparent; }
 textarea::placeholder { color: var(--muted); opacity: 0.7; }
 
 .unknown {
@@ -182,6 +183,26 @@ textarea::placeholder { color: var(--muted); opacity: 0.7; }
   border: var(--bw) solid var(--line); border-radius: 14px;
   -webkit-touch-callout: default;
 }
+/* Tap a glyph in the preview to find its word: the glyph and the word get the same ochre ring, and a bubble over the word
+   shows the glyph, the word and its meaning. The image sits in a wrap so the ring can be laid over it; the overlay lets
+   taps and the long press through to the image. */
+.out-wrap { position: relative; display: inline-block; max-width: 100%; vertical-align: top; }
+.out-ring { position: absolute; inset: var(--bw); pointer-events: none; }
+.ring { position: absolute; box-sizing: border-box; border: 3px solid var(--accent); background: rgba(232, 197, 131, 0.28); border-radius: 12px; opacity: 0; transition: left .14s, top .14s, width .14s, height .14s, opacity .15s; }
+.ring.show { opacity: 1; }
+/* The mirror sits behind the box with transparent letters, so the tapped word's ring lands exactly under the real ones.
+   The field is its own stacking context, so the mirror can go under the box and still over the page. */
+.field { isolation: isolate; }
+.mirror { position: absolute; top: 0; left: 0; z-index: -1; overflow: hidden; pointer-events: none; color: transparent; border-color: transparent; white-space: pre-wrap; overflow-wrap: break-word; }
+.mirror .hit { background: rgba(232, 197, 131, 0.28); border-radius: 7px; box-shadow: 0 0 0 3px rgba(232, 197, 131, 0.28), 0 0 0 5px var(--accent); }
+/* The bubble: the glyph big, the word and its meaning beside it; a cartouche is wide, so it goes on top instead. */
+.wpop { position: absolute; z-index: 6; display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 10px; align-items: center; background: var(--bg); color: var(--fg); border: var(--bw) solid var(--line); border-radius: 16px; padding: 8px 14px 8px 10px; max-width: 280px; pointer-events: none; opacity: 0; transition: opacity .12s; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18); }
+.wpop.show { opacity: 1; }
+.wpop.wide { grid-template-columns: minmax(0, 1fr); row-gap: 2px; max-width: 100%; }
+.wpop-glyph { grid-row: span 2; font-family: "NasinNanpa"; font-size: 44px; line-height: 1; }
+.wpop.wide .wpop-glyph { grid-row: auto; font-size: 34px; margin-bottom: 4px; }
+.wpop-word { font-weight: 700; line-height: 1.2; }
+.wpop-meaning { color: var(--muted); font-size: 0.85rem; line-height: 1.25; }
 button, .btn {
   font: 700 1rem/1 var(--font);
   border-radius: 999px; border: var(--bw) solid var(--line);
@@ -407,7 +428,7 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
   transition: opacity .2s, transform .2s; pointer-events: none; z-index: 60; /* above the cheat sheet */
 }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
-@media (prefers-reduced-motion: reduce) { .toast, .shelf, body { transition: none; } button:active { transform: none; } }
+@media (prefers-reduced-motion: reduce) { .toast, .shelf, .ring, body { transition: none; } button:active { transform: none; } }
 </style>
 </head>
 <body>
@@ -446,14 +467,16 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
       <label class="lbl" for="text">Your message</label>
       <button type="button" class="icon-btn book-btn" id="book-btn" aria-label="Open the cheat sheet" title="Cheat sheet" aria-expanded="false" aria-controls="sheet"><span class="theme-glyph" aria-hidden="true">sona</span></button>
     </div>
+    <div class="mirror" id="mirror" aria-hidden="true"></div>
     <textarea id="text" autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="toki! mi jan Mali."></textarea>
+    <div class="wpop" id="wpop" aria-hidden="true"></div>
     <div class="unknown" id="unknown" hidden></div>
   </section>
 
   <section>
     <div class="stage" id="stage">
       <span class="lbl" aria-hidden="true">Preview</span>
-      <img id="out" alt="Your message written in sitelen pona">
+      <span class="out-wrap"><img id="out" alt="Your message written in sitelen pona"><div class="out-ring" id="out-ring" aria-hidden="true"></div></span>
       <button type="button" class="opts-btn" id="opts-btn" aria-label="Settings" title="Settings" aria-haspopup="dialog" aria-controls="opts"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 4h-7M10 4H3M21 12h-9M8 12H3M21 20h-5M12 20H3M14 2v4M8 10v4M16 18v4"/></svg></button>
       <div class="actions">
         <button class="primary" id="copy" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>Copy image</button>
@@ -471,6 +494,7 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
       <li>Join two glyphs with <code>&amp;</code>, stack them with <code>-</code>, or scale them with <code>+</code>: <code>toki&amp;pona</code></li>
       <li>Add <code>1</code> after a word for its alternate glyph: <code>mute1</code>, <code>sewi1</code></li>
       <li>Each sentence ending in <code>.</code>, <code>!</code> or <code>?</code> starts a new line in the image. Turn that off under Lines, or start a new line in the text yourself.</li>
+      <li>Tap a glyph in the preview to see which word it is.</li>
     </ul>
   </details>
 
@@ -607,29 +631,31 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
     return glyphs.length ? "[" + glyphs.join("") + "]" : null;
   }
 
-  function parseLine(line, unknown, names) {
+  // Each segment keeps where it came from in the text (from, to) and, for a name, the name as typed, for the glyph tap below.
+  function parseLine(line, unknown, names, base = 0) {
     const segs = [];
+    const at = (seg) => { seg.from = base + m.index; seg.to = base + m.index + m[0].length; return seg; };
     const re = /\[[^\]]*\]?|[^\s\[]+/g;
     let m;
     while ((m = re.exec(line))) {
       let tok = m[0];
       if (tok[0] === "[") {
         const inner = tok.replace(/^\[|\]$/g, "").replace(/\s+/g, "");
-        if (inner) segs.push({ t: "[" + inner.toLowerCase() + "]", glyph: true });
+        if (inner) segs.push(at({ t: "[" + inner.toLowerCase() + "]", glyph: true }));
         continue;
       }
       tok = tok.replace(LEAD, "");
       const punct = (tok.match(TRAIL) || [""])[0].replace(/[;"')\]]/g, (c) => (c === ";" ? ":" : ""));
       const core = tok.replace(TRAIL, "");
-      if (!core) { if (punct) segs.push({ t: punct, glyph: true }); continue; }
+      if (!core) { if (punct) segs.push(at({ t: punct, glyph: true })); continue; }
 
       if (isKnown(core)) {
-        segs.push({ t: core.toLowerCase() + punct, glyph: true });
+        segs.push(at({ t: core.toLowerCase() + punct, glyph: true }));
       } else if (names && /^[A-Z][A-Za-z]*$/.test(core) && nameToCartouche(core)) {
-        segs.push({ t: nameToCartouche(core) + punct, glyph: true });
+        segs.push(at({ t: nameToCartouche(core) + punct, glyph: true, name: core }));
       } else {
         unknown.add(core);
-        segs.push({ t: core + punct, glyph: false });
+        segs.push(at({ t: core + punct, glyph: false }));
       }
     }
     return segs;
@@ -675,12 +701,15 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
   }
 
   let currentBlob = null, currentUrl = null, renderPromise = null;
+  let lastPaint = null; // the canvas the preview shows, with its boxes
   let fontsReady = false;
 
   // Text → lines of segments, shaped by the names and sentences settings. `unknown` collects words drawn as plain letters.
   function parseText(text, opts, unknown = new Set()) {
+    let base = 0;
     const lines = text.split("\n").flatMap((l) => {
-      const segs = parseLine(l, unknown, opts.names);
+      const segs = parseLine(l, unknown, opts.names, base);
+      base += l.length + 1;
       return opts.sentences ? splitSentences(segs) : [segs];
     });
     while (lines.length && !lines[lines.length - 1].length) lines.pop();
@@ -708,12 +737,14 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
     g.fillStyle = st.ink;
     if (empty) g.globalAlpha = 0.25;
     g.textBaseline = "middle";
+    c.boxes = []; // where each segment landed, in canvas pixels, for the glyph tap
     rows.forEach((row, i) => {
       let x = pad;
       const y = pad + i * lineH + size * 0.55;
       for (const seg of row.segs) {
         g.font = fontFor(seg, size);
         g.fillText(seg.t, x, y);
+        if (!empty) c.boxes.push({ seg, x, y: y - size * 0.55, w: seg.w, h: size * 1.1, size });
         x += seg.w + gap;
       }
     });
@@ -723,6 +754,8 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
   function render() {
     const unknown = new Set();
     const c = paint(textEl.value, state, unknown);
+    lastPaint = c;
+    syncTap();
 
     if (unknown.size) {
       const b = document.createElement("b");
@@ -1298,6 +1331,87 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
       toast("Installed. Open ilo sitelen from your home screen.");
     });
   })();
+
+  // ---------- tap a glyph: which word is this? ----------
+  // A tap on a glyph in the preview rings the glyph, rings its word in the box, and shows a bubble over the word with the
+  // glyph, the word and its meaning. They stay until the next tap or an edit; a tap beside the glyphs clears them. The
+  // segments know where they came from (parseLine) and where they landed (paint); the ring over the image scales from
+  // canvas pixels to the image as shown, and the mirror behind the box, one span per segment, places the word.
+  const mirrorEl = $("mirror"), popEl = $("wpop"), ringEl = $("out-ring"), fieldEl = textEl.closest(".field"), topbarEl = document.querySelector(".topbar");
+  const MEANING = new Map(); // the bubble's gloss: the function sense first, then the everyday one
+  for (const [, , words] of SHEET) for (const [w, m, alts] of words) {
+    const add = (word, sense) => { const l = MEANING.get(word) || []; if (!l.includes(sense) && l.length < 2) MEANING.set(word, [...l, sense]); };
+    add(w, m);
+    for (const [a, note] of alts || []) add(a, m + " (" + note + ")");
+  }
+  const bare = (t) => t.replace(TRAIL, "");
+  function gloss(seg) {
+    if (!seg.glyph) return "not toki pona, drawn as letters";
+    if (seg.name) return "a name, one glyph per sound: " + [...seg.name.toLowerCase()].map((ch) => SOUND[ch]).filter(Boolean).join(" ");
+    if (seg.t[0] === "[") return "a cartouche";
+    if (!bare(seg.t)) return seg.t.includes(":") ? "a colon" : "ends the sentence, so a new line starts";
+    return bare(seg.t).split(/[&+\-]/).map((p) => (MEANING.get(p) || []).join(" · ")).filter(Boolean).join(" + ");
+  }
+
+  // The mirror follows the box's size (its corner can be dragged) and scroll.
+  new ResizeObserver(() => { mirrorEl.style.width = textEl.offsetWidth + "px"; mirrorEl.style.height = textEl.offsetHeight + "px"; }).observe(textEl);
+  textEl.addEventListener("scroll", () => { mirrorEl.scrollTop = textEl.scrollTop; });
+
+  let segs = [], words = [], tapped = null; // tapped: the segment's index, and the text it was tapped in
+  // After each paint: the segments the preview now shows, the mirror rebuilt around them, and the ring kept or dropped.
+  function syncTap() {
+    segs = lastPaint.boxes.map((b) => b.seg);
+    const text = textEl.value, frag = document.createDocumentFragment();
+    let i = 0;
+    segs.forEach((s, n) => {
+      if (s.from > i) frag.append(text.slice(i, s.from));
+      frag.append(el("span", { class: "w", "data-i": n }, text.slice(i = s.from, i = s.to)));
+    });
+    frag.append(text.slice(i), "​");
+    mirrorEl.replaceChildren(frag);
+    words = [...mirrorEl.querySelectorAll(".w")];
+    if (tapped && tapped.text !== text) tapped = null;
+    showTap();
+  }
+  outEl.addEventListener("click", (e) => {
+    if (!lastPaint || !outEl.naturalWidth) return;
+    const r = outEl.getBoundingClientRect(), k = outEl.naturalWidth / outEl.clientWidth;
+    const x = (e.clientX - r.left - outEl.clientLeft) * k, y = (e.clientY - r.top - outEl.clientTop) * k;
+    const b = lastPaint.boxes.find((b) => x >= b.x - b.size * 0.15 && x <= b.x + b.w + b.size * 0.15 && y >= b.y && y <= b.y + b.h);
+    tapped = b ? { i: segs.indexOf(b.seg), text: textEl.value } : null;
+    showTap();
+    // On a phone the box may have scrolled under the top bar: bring the bubble back into view.
+    const top = popEl.getBoundingClientRect().top - topbarEl.offsetHeight - 8;
+    if (tapped && top < 0) scrollBy({ top, behavior: "smooth" });
+  });
+  textEl.addEventListener("input", () => { if (tapped) { tapped = null; showTap(); } });
+  outEl.addEventListener("load", showTap);
+  new ResizeObserver(showTap).observe(outEl);
+
+  function showTap() {
+    const i = tapped ? tapped.i : -1, s = segs[i], w = words[i];
+    const b = s && lastPaint.boxes.find((b) => b.seg === s), k = outEl.naturalWidth ? outEl.clientWidth / outEl.naturalWidth : 0;
+    const ring = ringEl.firstElementChild || ringEl.appendChild(el("div", { class: "ring" }));
+    words.forEach((span, n) => span.classList.toggle("hit", n === i));
+    if (!b || !k || !w) { ring.classList.remove("show"); popEl.classList.remove("show"); return; }
+    // The glyph's ring, a little wider than the glyph. It slides over from the last one while that is still showing.
+    const m = b.size * 0.08, fresh = !ring.classList.contains("show");
+    if (fresh) ring.style.transition = "none";
+    Object.assign(ring.style, { left: (b.x - m) * k + "px", top: (b.y - m) * k + "px", width: (b.w + 2 * m) * k + "px", height: (b.h + 2 * m) * k + "px" });
+    if (fresh) { void ring.offsetWidth; ring.style.transition = ""; }
+    ring.classList.add("show");
+    // The bubble over the word: the glyph as the image draws it, the word as typed for a name or plain letters.
+    const typed = bare(textEl.value.slice(s.from, s.to).replace(LEAD, ""));
+    popEl.replaceChildren(
+      ...(s.glyph ? [el("span", { class: "wpop-glyph" }, s.t)] : []),
+      el("span", { class: "wpop-word" }, s.glyph && !s.name ? bare(s.t) || s.t : typed),
+      el("span", { class: "wpop-meaning" }, gloss(s)));
+    popEl.className = "wpop show" + (s.t[0] === "[" || !s.glyph ? " wide" : "");
+    const r = w.getClientRects()[0], f = fieldEl.getBoundingClientRect();
+    const cx = r.left + r.width / 2 - f.left, pw = popEl.offsetWidth;
+    popEl.style.left = Math.max(0, Math.min(cx - pw / 2, fieldEl.clientWidth - pw)) + "px";
+    popEl.style.top = r.top - f.top - popEl.offsetHeight - 6 + "px";
+  }
 
   // ---------- offline, and updates ----------
   // sw.js serves the app from its cache, so a deploy ships a new sw.js. The browser installs that worker beside
