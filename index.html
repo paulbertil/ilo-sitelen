@@ -222,6 +222,9 @@ button:active, .btn:active { transform: scale(0.98); }
 .actions > * { height: 42px; padding: 0 14px; font-size: 0.9rem; }
 .actions svg { width: 18px; height: 18px; flex: none; }
 .actions .round { width: 42px; padding: 0; border-radius: 50%; }
+/* On a narrow phone the full row would run over the settings chip across from it: Copy image shortens to Copy, then to its icon. */
+@media (max-width: 359px) { .copy-rest { display: none; } }
+@media (max-width: 319px) { .copy-label { display: none; } #copy { width: 42px; padding: 0; } }
 /* The settings chip sits at the bottom left of the frame, across from the send chips. It opens the settings dialog. */
 .opts-btn { position: absolute; left: 12px; bottom: 12px; width: 42px; height: 42px; padding: 0; border-radius: 50%; }
 .opts-btn svg { width: 18px; height: 18px; }
@@ -468,7 +471,7 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
       <span class="out-wrap"><img id="out" alt="Your message written in sitelen pona"><div class="out-ring" id="out-ring" aria-hidden="true"></div></span>
       <button type="button" class="opts-btn" id="opts-btn" aria-label="Settings" title="Settings" aria-haspopup="dialog" aria-controls="opts"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 4h-7M10 4H3M21 12h-9M8 12H3M21 20h-5M12 20H3M14 2v4M8 10v4M16 18v4"/></svg></button>
       <div class="actions">
-        <button class="primary" id="copy" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>Copy image</button>
+        <button class="primary" id="copy" type="button" aria-label="Copy image"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span class="copy-label">Copy<span class="copy-rest"> image</span></span></button>
         <button class="round" id="share" type="button" aria-label="Share" title="Share" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m8 7 4-4 4 4"/><path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7"/></svg></button>
         <a class="btn round" id="save" download="sitelen-pona.png" href="#" aria-label="Save" title="Save" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></svg></a>
       </div>
