@@ -1334,7 +1334,8 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
 
   // ---------- tap a glyph: which word is this? ----------
   // A tap on a glyph in the preview rings the glyph, rings its word in the box, and shows a bubble over the word with the
-  // glyph, the word and its meaning. They stay until the next tap or an edit; a tap beside the glyphs clears them. The
+  // glyph, the word and its meaning. They stay until the next tap or an edit; a tap on the ringed glyph again, beside the
+  // glyphs or anywhere else on the page clears them. The
   // segments know where they came from (parseLine) and where they landed (paint); the ring over the image scales from
   // canvas pixels to the image as shown, and the mirror behind the box, one span per segment, places the word.
   const mirrorEl = $("mirror"), popEl = $("wpop"), ringEl = $("out-ring"), fieldEl = textEl.closest(".field"), topbarEl = document.querySelector(".topbar");
@@ -1378,13 +1379,16 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
     const r = outEl.getBoundingClientRect(), k = outEl.naturalWidth / outEl.clientWidth;
     const x = (e.clientX - r.left - outEl.clientLeft) * k, y = (e.clientY - r.top - outEl.clientTop) * k;
     const b = lastPaint.boxes.find((b) => x >= b.x - b.size * 0.15 && x <= b.x + b.w + b.size * 0.15 && y >= b.y && y <= b.y + b.h);
-    tapped = b ? { i: segs.indexOf(b.seg), text: textEl.value } : null;
+    const i = b ? segs.indexOf(b.seg) : -1;
+    tapped = b && !(tapped && tapped.i === i) ? { i, text: textEl.value } : null;
     showTap();
     // On a phone the box may have scrolled under the top bar: bring the bubble back into view.
     const top = popEl.getBoundingClientRect().top - topbarEl.offsetHeight - 8;
     if (tapped && top < 0) scrollBy({ top, behavior: "smooth" });
   });
-  textEl.addEventListener("input", () => { if (tapped) { tapped = null; showTap(); } });
+  const clearTap = () => { if (tapped) { tapped = null; showTap(); } };
+  textEl.addEventListener("input", clearTap);
+  document.addEventListener("click", (e) => { if (!outEl.contains(e.target)) clearTap(); });
   outEl.addEventListener("load", showTap);
   new ResizeObserver(showTap).observe(outEl);
 
