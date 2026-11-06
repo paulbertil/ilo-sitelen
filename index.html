@@ -236,6 +236,19 @@ button:active, .btn:active { transform: scale(0.98); }
 .ask button { height: 42px; padding: 0 14px; font-size: 0.9rem; flex: 0 1 auto; min-width: 0; white-space: nowrap; }
 .ask[hidden] { display: none; }
 .stage.asking .actions, .stage.asking .opts-btn { visibility: hidden; }
+/* PROTOTYPE: three behaviours for sending a changed message, picked by ?variant=send|leave|quiet. Everything marked
+   PROTOTYPE goes, with prototype/, once one is chosen. The bar switches between them, the dialog is the "leave"
+   variant's question, and the toast button is the "quiet" variant's way back. */
+.proto-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 12px; font-size: 0.78rem; color: var(--muted); }
+.proto-bar a { padding: 5px 10px; border: 2px solid var(--line); border-radius: 999px; color: var(--fg); text-decoration: none; }
+.proto-bar a.on { background: var(--accent); color: var(--accent-ink); }
+.leave-text { margin: 4px 0 14px; color: var(--muted); font-size: 0.95rem; line-height: 1.4; }
+.leave-text q { color: var(--fg); font-weight: 700; }
+.leave-acts { display: grid; gap: 8px; }
+#leave-drop { border-color: transparent; color: var(--muted); }
+.toast.has-action { display: inline-flex; align-items: center; gap: 10px; text-align: left; padding: 7px 8px 7px 18px; border-radius: 24px; }
+.toast.show.has-action { pointer-events: auto; }
+.toast-act { padding: 7px 12px; font-size: 0.85rem; background: var(--bg); color: var(--fg); border-color: var(--bg); flex: none; }
 
 /* ---- Settings: Size, Colors, Names and Lines as a list in a modal card opened from the chip in the preview frame.
    One row per setting: its glyph, its name, a line of help and the control, with a rule between rows. The page behind
@@ -567,6 +580,18 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
   </label>
 </div>
 </dialog>
+<!-- PROTOTYPE (leave): asked when New or a card would replace a box that holds a changed message. -->
+<dialog class="opts" id="leave" aria-labelledby="leave-title">
+<div class="opts-card">
+  <div class="opts-bar"><h2 id="leave-title">Save your changes?</h2></div>
+  <p class="leave-text">You changed <q id="leave-old"></q>.</p>
+  <div class="leave-acts">
+    <button type="button" class="primary" id="leave-save">Save changes</button>
+    <button type="button" id="leave-new">Save as new</button>
+    <button type="button" id="leave-drop">Discard changes</button>
+  </div>
+</div>
+</dialog>
 <div class="scrim" id="scrim" hidden></div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
@@ -601,6 +626,22 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
   const recentsBtn = $("recents-btn"), shelfList = $("s-list"), scrimEl = $("scrim");
   // The "Check the cheat sheet." link in the Not toki pona line; render() needs it from the first paint.
   const sheetLink = el("button", { class: "linkbtn", type: "button", onclick: () => setSheet(true) }, "cheat sheet");
+
+  // PROTOTYPE: three behaviours for sending a changed message, picked by ?variant=. Everything marked PROTOTYPE goes,
+  // with prototype/, once one is chosen.
+  //   send:  ask in place of the chips before the send (the default)
+  //   leave: send without asking or recording; ask in a dialog when New or a card would replace the box
+  //   quiet: replace without asking; the toast offers "Keep both"
+  const variantParam = new URLSearchParams(location.search).get("variant");
+  const VARIANT = ["send", "leave", "quiet"].includes(variantParam) ? variantParam : "send";
+  if (variantParam) {
+    const bar = el("nav", { class: "proto-bar", "aria-label": "Prototype variants" }, "Prototype:");
+    for (const [v, name] of [["send", "Ask on send"], ["leave", "Ask on leaving"], ["quiet", "Quiet, keep both"]]) {
+      bar.append(el("a", { href: "?variant=" + v, class: v === VARIANT ? "on" : "" }, name));
+    }
+    bar.append(el("a", { href: "prototype/" }, "About"));
+    document.querySelector("main").prepend(bar);
+  }
 
   const store = {
     get(k, d) { try { const v = localStorage.getItem("ilo-sitelen:" + k); return v == null ? d : v; } catch { return d; } },
@@ -775,11 +816,20 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
 
   // ---------- actions ----------
   let toastTimer = 0;
-  function toast(msg) {
+  // PROTOTYPE (quiet): action, when given, is { label, run }, a button in the toast, which then stays up longer.
+  function toast(msg, action) {
     toastEl.textContent = msg;
+    if (action) toastEl.append(el("button", { class: "toast-act", type: "button", onclick: () => { hideToast(); action.run(); } }, action.label));
+    toastEl.classList.toggle("has-action", !!action);
     toastEl.classList.add("show");
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => toastEl.classList.remove("show"), 2800);
+    toastTimer = setTimeout(hideToast, action ? 7000 : 2800);
+  }
+  function hideToast() {
+    clearTimeout(toastTimer);
+    toastEl.classList.remove("show");
+    const b = toastEl.querySelector("button");
+    if (b) b.remove(); // a faded toast must not keep a button that the keyboard can still reach
   }
 
   function blobNow() { return currentBlob ? Promise.resolve(currentBlob) : renderPromise; }
@@ -788,19 +838,22 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
   // asks, "<verb> and replace" or "<verb> as new", and the chosen button runs go(mode) from its own tap, which is what
   // Safari needs for the clipboard and the share sheet. Otherwise go(null) runs at once and recordRecent() decides.
   function sendOrAsk(verb, go) {
-    if (needsAsk()) { ask(verb, go); return false; }
-    go(null); return true;
+    if (!needsAsk()) { go(null); return true; }
+    // PROTOTYPE: "quiet" replaces without asking; "leave" sends without recording, and asks when the box is left.
+    if (VARIANT === "quiet") { go("replace"); return true; }
+    if (VARIANT === "leave") { go("hold"); return true; }
+    ask(verb, go); return false;
   }
 
   copyBtn.addEventListener("click", () => sendOrAsk("Copy", async (mode) => {
-    recordRecent(mode);
+    const undo = recordRecent(mode); // PROTOTYPE (quiet): the way back from a silent replace, or null
     try {
       if (!window.ClipboardItem || !navigator.clipboard?.write) throw new Error("unsupported");
       // Safari wants the promise handed over synchronously inside the tap.
       await navigator.clipboard.write([new ClipboardItem({ "image/png": blobNow() })]);
-      toast("Copied. Paste it in your chat.");
+      toast(undo ? "Copied. Updated in Recents." : "Copied. Paste it in your chat.", undo);
     } catch {
-      toast("Copying isn't allowed here. Press and hold the image, then tap Copy.");
+      toast("Copying isn't allowed here. Press and hold the image, then tap Copy.", undo);
     }
   }));
 
@@ -811,7 +864,8 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
       try {
         const blob = await blobNow();
         await navigator.share({ files: [new File([blob], "sitelen-pona.png", { type: "image/png" })] });
-        recordRecent(mode);
+        const undo = recordRecent(mode);
+        if (undo) toast("Updated in Recents.", undo);
       } catch (e) {
         if (e && e.name === "AbortError") return;
         toast("Sharing isn't available here. Use Copy instead.");
@@ -824,11 +878,14 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
   let saveAnswered = false;
   saveLink.addEventListener("click", (e) => {
     if (saveAnswered) return;
+    let asked = false;
     const straight = sendOrAsk("Save", (mode) => {
-      recordRecent(mode);
-      if (mode) { saveAnswered = true; saveLink.click(); saveAnswered = false; }
+      const undo = recordRecent(mode);
+      if (undo) toast("Updated in Recents.", undo);
+      if (asked) { saveAnswered = true; saveLink.click(); saveAnswered = false; }
     });
-    if (!straight) e.preventDefault();
+    asked = !straight;
+    if (asked) e.preventDefault();
   });
 
   // The question itself. Tapping anywhere else, Escape, or editing the text withdraws it with nothing sent.
@@ -1005,8 +1062,10 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
   // text, so another card saying the same thing gives way. The written card goes to the top and the box belongs to it.
   function recordRecent(mode) {
     const text = textEl.value.trim();
-    if (!text) return;
+    if (!text || mode === "hold") return null; // PROTOTYPE (leave): "hold" sends a changed message without recording it
     const a = attached();
+    // PROTOTYPE (quiet): the list before a silent replace, so the toast can offer to keep both.
+    const before = VARIANT === "quiet" && mode === "replace" ? JSON.stringify(recents) : null;
     const card = (a && mode !== "new" && (mode === "replace" || a.text === text)) ? a : (recents.find((r) => r.text === text) || { id: newId() });
     recents = recents.filter((r) => r !== card && r.text !== text);
     Object.assign(card, { text, size: state.size, style: styleId(state.style), names: state.names, sentences: state.sentences, at: Date.now() });
@@ -1019,6 +1078,21 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
       store.set("persist-asked", "1");
       try { navigator.storage?.persist?.().catch(() => {}); } catch {}
     }
+    return before ? { label: "Keep both", run: () => keepBoth(before, card.id) } : null;
+  }
+  // PROTOTYPE (quiet): take back a silent replace. The list goes back to what it was, and what was sent becomes a card
+  // of its own at the top, which the box follows if it still belonged to the replaced card.
+  function keepBoth(before, id) {
+    const sent = recents.find((r) => r.id === id);
+    if (!sent) return;
+    const fresh = { ...sent, id: newId() };
+    recents = JSON.parse(before).filter((r) => r.text !== fresh.text);
+    recents.unshift(fresh);
+    if (recents.length > RECENTS_MAX) recents.length = RECENTS_MAX;
+    saveRecents();
+    if (attachedId === id) setAttached(fresh.id);
+    renderShelf();
+    toast("Kept both.");
   }
   // Copying a card's image from the shelf sends it again: it moves to the top, and the box stays as it is.
   function touch(r) {
@@ -1100,7 +1174,7 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
           copy, del);
       }
       const card = el("article", { class: "card" },
-        el("button", { class: "card-img", type: "button", "aria-label": "Open: " + firstLine(r.text), onclick: () => openRecent(r) }, el("img", { src: thumbUrl(r), alt: "" })),
+        el("button", { class: "card-img", type: "button", "aria-label": "Open: " + firstLine(r.text), onclick: () => leaving(() => openRecent(r)) }, el("img", { src: thumbUrl(r), alt: "" })),
         meta);
       cards.push([card, r]);
       shelfList.append(card);
@@ -1172,7 +1246,30 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
   const syncShelf = () => { if (wide.matches && shelfOpen !== wantsShelf()) setShelf(wantsShelf()); };
   recentsBtn.addEventListener("click", () => { setShelf(true); if (!wide.matches) $("s-close").focus(); });
   $("s-close").addEventListener("click", () => { setShelf(false); recentsBtn.focus(); });
-  $("s-new").addEventListener("click", newMessage);
+  $("s-new").addEventListener("click", () => leaving(newMessage));
+
+  // PROTOTYPE (leave): New or a card is about to replace a box that belongs to a card but says something else. The
+  // dialog settles that change first (save it over the card, save it as a new card, or drop it), then the tap goes
+  // ahead. Escape or a tap outside closes the dialog and stays.
+  const leaveEl = $("leave");
+  let leaveNext = null;
+  function leaving(next) {
+    if (VARIANT !== "leave" || !needsAsk()) { next(); return; }
+    leaveNext = next;
+    $("leave-old").textContent = firstLine(attached().text);
+    leaveEl.showModal();
+  }
+  function settleLeave(mode) {
+    const next = leaveNext;
+    leaveNext = null; leaveEl.close();
+    if (mode) recordRecent(mode);
+    if (next) next();
+  }
+  $("leave-save").addEventListener("click", () => settleLeave("replace"));
+  $("leave-new").addEventListener("click", () => settleLeave("new"));
+  $("leave-drop").addEventListener("click", () => settleLeave(null));
+  leaveEl.addEventListener("click", (e) => { if (e.target === leaveEl) leaveEl.close(); });
+  leaveEl.addEventListener("close", () => { leaveNext = null; });
   scrimEl.addEventListener("click", () => setShelf(false));
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && shelfOpen && !wide.matches) { setShelf(false); recentsBtn.focus(); } });
   wide.addEventListener("change", () => { setShelf(wantsShelf()); syncSheetMode(); });
