@@ -85,6 +85,8 @@ try { const t = localStorage.getItem("ilo-sitelen:theme"); if (t === "light" || 
 [hidden] { display: none !important; }
 img { max-width: 100%; }
 html { scroll-padding-top: calc(60px + env(safe-area-inset-top, 0px)); }
+/* Installed on an iPhone, the black-translucent status bar moves the document up, which leaves a bar at the bottom of the screen. */
+@media (display-mode: standalone) { html { min-height: calc(100% + env(safe-area-inset-top, 0px)); } }
 html, body { background: var(--bg); color: var(--fg); }
 body {
   margin: 0;
@@ -417,16 +419,8 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
   body.sheet-open .opts { right: var(--sheet-w); }
 }
 
-/* Installed on an iPhone with the black-translucent status bar, bottom: 0 lands that bar's height above the screen's edge
-   (WebKit bug 236445). The script measures the shortfall into --vp-gap, and these pull everything pinned to the bottom
-   down by it. It can never exceed the top inset, so a shrunken viewport, such as with the keyboard open, moves nothing
-   further. Measured rather than assumed, so this goes to zero by itself if iOS fixes the bug. */
-:root { --under: min(var(--vp-gap, 0px), env(safe-area-inset-top, 0px)); }
-.opts, .opts::backdrop, .scrim, .sheet-scrim, .shelf, .sheet { bottom: calc(-1 * var(--under, 0px)); }
-.vp-debug { margin: 0; padding: 0 16px 12px; font-size: 0.68rem; font-weight: 500; line-height: 1.35; color: var(--muted); } /* TEMPORARY */
-
 .toast {
-  position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px) - var(--under, 0px));
+  position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px));
   transform: translateX(-50%) translateY(20px); opacity: 0;
   background: var(--fg); color: var(--bg);
   padding: 11px 18px; border-radius: 999px; font-size: 0.92rem; font-weight: 700;
@@ -572,7 +566,6 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
     <input type="checkbox" class="switch" id="sentences" checked>
   </label>
 </div>
-<p class="vp-debug" id="vp-debug"></p><!-- TEMPORARY: viewport numbers for the iPhone bottom gap -->
 </dialog>
 <div class="scrim" id="scrim" hidden></div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
@@ -913,28 +906,8 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
   // The settings dialog: a modal card opened from the chip in the preview frame. Done, Escape or a tap on the scrim closes
   // it (Escape is the dialog's own cancel), and the dialog hands focus back to the chip. The card fills the dialog, so a
   // tap on the dialog itself is the scrim.
-  // How far short of the screen's bottom edge a fixed element ends in the installed app. See --under in the styles.
-  // A browser's toolbars take up the same difference for a good reason, so only the installed app measures it.
-  const installed = matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
-  const vpProbe = document.createElement("div");
-  vpProbe.style.cssText = "position:fixed;inset:0;visibility:hidden;pointer-events:none;z-index:-1";
-  document.body.append(vpProbe);
-  const vpGap = () => {
-    const screenH = innerWidth > innerHeight ? Math.min(screen.width, screen.height) : Math.max(screen.width, screen.height);
-    return Math.max(0, screenH - vpProbe.getBoundingClientRect().bottom);
-  };
-  const measureGap = () => { if (installed) document.documentElement.style.setProperty("--vp-gap", vpGap() + "px"); };
-  measureGap();
-  for (const ev of ["resize", "orientationchange", "pageshow"]) addEventListener(ev, measureGap);
-
   const optsEl = $("opts"), optsBtn = $("opts-btn");
-  optsBtn.addEventListener("click", () => {
-    measureGap();
-    // TEMPORARY: viewport numbers for the iPhone bottom gap.
-    const under = getComputedStyle(document.documentElement).getPropertyValue("--under").trim();
-    $("vp-debug").textContent = `v32 · ${installed ? "installed" : "browser"} · screen ${screen.width}x${screen.height} · inner ${innerWidth}x${innerHeight} · fixed bottom ${vpProbe.getBoundingClientRect().bottom} · gap ${vpGap()} · ${under}`;
-    optsEl.showModal();
-  });
+  optsBtn.addEventListener("click", () => optsEl.showModal());
   $("opts-done").addEventListener("click", () => optsEl.close());
   optsEl.addEventListener("click", (e) => { if (e.target === optsEl) optsEl.close(); });
 
