@@ -1448,7 +1448,21 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
     setGlyphs(g, text);
     return g;
   }
-  function syncSheetGlyphs() { for (const g of sheetBody.querySelectorAll(".wt-g[data-g]")) setGlyphs(g, g.dataset.g); }
+  // Whether the chosen font draws a text all by itself. Until the font has loaded everything is nasin nanpa, so all fits.
+  function fits(text) {
+    const f = fontOf(state.font);
+    if (!f.url || !loaded.has(f.id)) return true;
+    return parseLine(text, true).every((s) => !s.glyph || spell(s, f) != null);
+  }
+  // The sheet shows only what the chosen font draws: a word it lacks, an alternate or a mark it has no glyph for is
+  // left out rather than drawn in nasin nanpa.
+  function syncSheetGlyphs() {
+    for (const g of sheetBody.querySelectorAll(".wt-g[data-g]")) {
+      setGlyphs(g, g.dataset.g);
+      g.parentNode.classList.toggle("nofit", !fits(g.dataset.g));
+    }
+    filterSheet();
+  }
   function wordTile(word, gloss, alt) {
     const t = el("button", { class: "wt" + (alt ? " alt" : ""), type: "button", title: word + ": " + gloss, onclick: () => tap(t, word, "word") },
       glyphSpan(word));
@@ -1483,14 +1497,19 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
     frag.append(el("p", { class: "sheet-empty", id: "sheet-none", hidden: "" }, "No word matches. Try an English meaning, like “eat”."));
     sheetBody.append(frag);
     sheetBuilt = true;
+    syncSheetGlyphs();
   }
-  // Search by Latin word or English meaning; a group hides when none of its tiles match.
+  // Search by Latin word or English meaning, among the tiles the font draws; a group hides when none of its tiles show.
   function filterSheet() {
+    if (!sheetBuilt) return;
     const q = sheetQ.value.trim().toLowerCase();
     let shown = 0;
     for (const sec of sheetBody.querySelectorAll(".wg")) {
       let n = 0;
-      for (const t of sec.querySelectorAll(".wt")) { const hit = !q || t.dataset.q.includes(q); t.hidden = !hit; if (hit) n++; }
+      for (const t of sec.querySelectorAll(".wt")) {
+        const hit = !t.classList.contains("nofit") && (!q || t.dataset.q.includes(q));
+        t.hidden = !hit; if (hit) n++;
+      }
       sec.hidden = !n; shown += n;
     }
     $("sheet-none").hidden = shown > 0;
