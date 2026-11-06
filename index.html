@@ -635,8 +635,8 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
   }
 
   // Long glyphs: a head word stretches a low line under the words in parentheses after it, pi(toki pona), and la runs
-  // backwards, (tenpo ni) la. The font draws a run only when it gets the whole string at once, so a run is one segment.
-  // These are the words the font has a long form for.
+  // backwards, (tenpo ni) la. The font draws a run only when it gets the whole string at once, so a run is one segment,
+  // handed over as pi(toki_pona). These are the words the font has a long form for.
   const LONG = new Set("a alasa anu awen kama ken kepeken lon nanpa open pi pini sona tawa wile wile1 n".split(" "));
 
   // Each segment keeps where it came from in the text (from, to) and, for a name, the name as typed, for the glyph tap below.
@@ -664,7 +664,9 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
       // The font does not carry the line under a cartouche, so a run holding one falls apart too.
       const drawable = inner.length > 0 && inner.every((s) => s.glyph && s.t[0] !== "[" && !/[.!?:]$/.test(s.t));
       if (drawable && (rev || LONG.has(word))) {
-        const run = inner.map((s) => s.t).join(" "), words = tok.slice(o + 1, end).trim().replace(/\s+/g, " ");
+        // Joined with the font's own extension mark: a space (or any other separator) ends the line after the first
+        // glyph in both WebKit and Blink, and plain concatenation would fuse "ma ni" into "mani".
+        const run = inner.map((s) => s.t).join("_"), words = tok.slice(o + 1, end).trim().replace(/\s+/g, " ");
         return [at({ t: rev ? "{" + run + "}la" : word + "(" + run + ")", glyph: true, long: { head: word, words, rev } })];
       }
       // Not a run the font can draw: the words on their own, parentheses dropped, so a wrong word gets flagged as usual.
