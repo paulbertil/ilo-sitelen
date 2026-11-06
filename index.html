@@ -487,6 +487,7 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
       <li>Or build a cartouche yourself: <code>[mama ala lipu ilo]</code></li>
       <li>Join two glyphs with <code>&amp;</code>, stack them with <code>-</code>, or scale them with <code>+</code>: <code>toki&amp;pona</code></li>
       <li>Add <code>1</code> after a word for its alternate glyph, or a higher number where there are more: <code>mute1</code>, <code>sewi1</code>, <code>ni3</code></li>
+      <li>Put the words a long glyph covers in parentheses: <code>pi(toki pona)</code>, <code>(tenpo ni) la</code></li>
       <li>In a cartouche, a comma after a glyph reads a syllable instead of the first letter: <code>[pona]</code> is P, <code>[pona,]</code> is Po, <code>[pona,,]</code> is Pona.</li>
       <li>Each sentence ending in <code>.</code>, <code>!</code> or <code>?</code> starts a new line in the image. Turn that off under Lines, or start a new line in the text yourself.</li>
       <li>Tap a glyph in the preview to see which word it is.</li>
@@ -633,34 +634,50 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
     return glyphs.length ? "[" + glyphs.join("") + "]" : null;
   }
 
+  // Long glyphs: a head word stretches a low line under the words in parentheses after it, pi(toki pona), and la runs
+  // backwards, (tenpo ni) la. The font draws a run only when it gets the whole string at once, so a run is one segment.
+  // These are the words the font has a long form for.
+  const LONG = new Set("a alasa anu awen kama ken kepeken lon nanpa open pi pini sona tawa wile wile1 n".split(" "));
+
   // Each segment keeps where it came from in the text (from, to) and, for a name, the name as typed, for the glyph tap below.
+  // Tokens: a cartouche, a long-glyph run (head word, optional space, parentheses), a reverse run ending in la, or a word.
   function parseLine(line, names, base = 0) {
     const segs = [];
-    const at = (seg) => { seg.from = base + m.index; seg.to = base + m.index + m[0].length; return seg; };
-    const re = /\[[^\]]*\]?|[^\s\[]+/g;
+    const re = /\[[^\]]*\]?|[A-Za-z0-9&+\-]+\s*\([^)]*\)?|[({][^)}]*[)}]\s*la\b|[^\s\[]+/g;
     let m;
-    while ((m = re.exec(line))) {
-      let tok = m[0];
-      if (tok[0] === "[") {
-        const inner = tok.replace(/^\[|\]$/g, "").replace(/\s+/g, "");
-        if (inner) segs.push(at({ t: "[" + inner.toLowerCase() + "]", glyph: true }));
-        continue;
-      }
-      tok = tok.replace(LEAD, "");
-      // A comma is dropped here; inside a cartouche (handled above) it stays and draws the syllable tick.
-      const punct = (tok.match(TRAIL) || [""])[0].replace(/[;,"')\]]/g, (c) => (c === ";" ? ":" : ""));
-      const core = tok.replace(TRAIL, "");
-      if (!core) { if (punct) segs.push(at({ t: punct, glyph: true })); continue; }
-
-      if (isKnown(core)) {
-        segs.push(at({ t: core.toLowerCase() + punct, glyph: true }));
-      } else if (names && /^[A-Z][A-Za-z]*$/.test(core) && nameToCartouche(core)) {
-        segs.push(at({ t: nameToCartouche(core) + punct, glyph: true, name: core }));
-      } else {
-        segs.push(at({ t: core + punct, glyph: false }));
-      }
-    }
+    while ((m = re.exec(line))) segs.push(...tokenSegs(m[0], base + m.index, names));
     return segs;
+  }
+
+  function tokenSegs(tok, from, names) {
+    const len = tok.length;
+    const at = (seg, a = 0, b = len) => { seg.from = from + a; seg.to = from + b; return seg; };
+    if (tok[0] === "[") {
+      const inner = tok.replace(/^\[|\]$/g, "").replace(/\s+/g, "");
+      return inner ? [at({ t: "[" + inner.toLowerCase() + "]", glyph: true })] : [];
+    }
+    const head = /^([A-Za-z0-9&+\-]+)\s*\(/.exec(tok), rev = /^[({][^)}]*[)}]\s*la$/.test(tok);
+    if (head || rev) {
+      const o = tok.search(/[({]/), c = tok.search(/[)}]/), end = c < 0 ? len : c;
+      const inner = parseLine(tok.slice(o + 1, end), names, from + o + 1);
+      const word = rev ? "la" : head[1].toLowerCase();
+      // The font does not carry the line under a cartouche, so a run holding one falls apart too.
+      const drawable = inner.length > 0 && inner.every((s) => s.glyph && s.t[0] !== "[" && !/[.!?:]$/.test(s.t));
+      if (drawable && (rev || LONG.has(word))) {
+        const run = inner.map((s) => s.t).join(" "), words = tok.slice(o + 1, end).trim().replace(/\s+/g, " ");
+        return [at({ t: rev ? "{" + run + "}la" : word + "(" + run + ")", glyph: true, long: { head: word, words, rev } })];
+      }
+      // Not a run the font can draw: the words on their own, parentheses dropped, so a wrong word gets flagged as usual.
+      return rev ? [...inner, ...tokenSegs("la", from + tok.lastIndexOf("la"), names)] : [...tokenSegs(head[1], from, names), ...inner];
+    }
+    tok = tok.replace(LEAD, "");
+    // A comma is dropped here; inside a cartouche (handled above) it stays and draws the syllable tick.
+    const punct = (tok.match(TRAIL) || [""])[0].replace(/[;,"')\]]/g, (c) => (c === ";" ? ":" : ""));
+    const core = tok.replace(TRAIL, "");
+    if (!core) return punct ? [at({ t: punct, glyph: true })] : [];
+    if (isKnown(core)) return [at({ t: core.toLowerCase() + punct, glyph: true })];
+    if (names && /^[A-Z][A-Za-z]*$/.test(core) && nameToCartouche(core)) return [at({ t: nameToCartouche(core) + punct, glyph: true, name: core })];
+    return [at({ t: core + punct, glyph: false })];
   }
 
   // One sentence per line, like handwritten sitelen pona. A line with no sentence end stays as it is.
@@ -1122,6 +1139,7 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
     ["+", "scales the 2nd glyph", "toki+pona", "glue"],
     ["[ ]", "cartouche (a name)", "[ilo]", "cartouche"],
     [",", "in a name: one syllable per tick", "[pona,,]", "glue"],
+    ["( )", "stretches pi, la, wile… under words", "pi(toki)", "long"],
     ["Mali", "capital = name", nameToCartouche("Mali"), null],
     [". ! ?", "start a new line", "toki. pona!", null],
   ];
@@ -1131,16 +1149,26 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
 
   // PLACE-START
   // Where a tap lands. Pure: the text, the remembered selection and what the tile stands for, to the new text and caret.
-  // A word gets a space before it unless the text before the caret is empty or ends in whitespace, a glue mark or "[",
-  // and a space after unless the next character is whitespace, punctuation or "]". A glue mark snaps to the word before
+  // A word gets a space before it unless the text before the caret is empty or ends in whitespace, a glue mark, "[" or "(",
+  // and a space after unless the next character is whitespace, punctuation, "]" or ")". A glue mark snaps to the word before
   // the caret (or before the end of the selection) with no space after; with no word there it leaves the text alone,
   // except that a syllable tick "," may follow another tick.
   // "[ ]" wraps a selection, its outer whitespace kept outside the brackets, else inserts "[]" with the caret inside;
   // inside brackets it steps out past the "]" and onto a space, closing the cartouche first if the "]" is missing.
+  // "( )" does the same with parentheses, and snaps onto the word before the caret so that pi(toki pona) has no gap.
   // Checked by scripts/test-place.mjs, which extracts this block.
   const inCartouche = (before) => before.lastIndexOf("[") > before.lastIndexOf("]");
-  const spaceBefore = (before) => before && !/[\s&+\-\[]$/.test(before) ? " " : "";
-  const spaceAfter = (after) => /^[\s.,!?:\]]/.test(after) ? "" : " ";
+  const inLong = (before) => before.lastIndexOf("(") > before.lastIndexOf(")");
+  // Past the closing mark, adding it first if it is missing, and onto a space.
+  function stepOut(v, e, close) {
+    const after = v.slice(e), i = after.indexOf(close);
+    if (i < 0) return { value: v.slice(0, e) + close + (/^\s/.test(after) ? "" : " ") + after, caret: e + 2 };
+    const pos = e + i + 1, rest = v.slice(pos);
+    if (/^\s/.test(rest)) return { value: v, caret: pos + 1 };
+    return { value: v.slice(0, pos) + " " + rest, caret: pos + 1 };
+  }
+  const spaceBefore = (before) => before && !/[\s&+\-\[(]$/.test(before) ? " " : "";
+  const spaceAfter = (after) => /^[\s.,!?:\])]/.test(after) ? "" : " ";
   function place(v, s, e, ins, kind) {
     const before = v.slice(0, s), after = v.slice(e);
     if (kind === "glue") {
@@ -1148,14 +1176,18 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
       if (!/[A-Za-z0-9]$/.test(b) && !(ins === "," && b.endsWith(","))) return { value: v, caret: e };
       return { value: b + ins + after, caret: b.length + ins.length };
     }
+    if (kind === "long") {
+      if (inLong(before)) return stepOut(v, e, ")");
+      const sel = v.slice(s, e), core = sel.trim(), ws = sel.length - sel.trimStart().length;
+      const b0 = before + sel.slice(0, ws), a = sel.slice(ws + core.length) + after;
+      const snap = /[A-Za-z0-9]$/.test(b0.replace(/\s+$/, ""));
+      const b = snap ? b0.replace(/\s+$/, "") : b0, lead = snap ? "" : spaceBefore(b);
+      if (core) { const trail = spaceAfter(a); return { value: b + lead + "(" + core + ")" + trail + a, caret: b.length + lead.length + core.length + 2 + trail.length }; }
+      const trail = after ? spaceAfter(after) : "";
+      return { value: b + lead + "()" + trail + after, caret: b.length + lead.length + 1 };
+    }
     if (kind === "cartouche") {
-      if (inCartouche(before)) {
-        const i = after.indexOf("]");
-        if (i < 0) return { value: v.slice(0, e) + "]" + (/^\s/.test(after) ? "" : " ") + after, caret: e + 2 };
-        const pos = e + i + 1, rest = v.slice(pos);
-        if (/^\s/.test(rest)) return { value: v, caret: pos + 1 };
-        return { value: v.slice(0, pos) + " " + rest, caret: pos + 1 };
-      }
+      if (inCartouche(before)) return stepOut(v, e, "]");
       const sel = v.slice(s, e), core = sel.trim();
       if (core) {
         const ws = sel.length - sel.trimStart().length;
@@ -1171,12 +1203,14 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
   }
   // PLACE-END
 
-  let sheetBuilt = false, cartoucheTile = null;
+  let sheetBuilt = false, cartoucheTile = null, longTile = null;
   let undo = []; // the text before each tap of this opening, newest last; emptied when the text changes under it and on close
   const selectionNow = () => { const v = textEl.value; return lastSel && lastSel[1] <= v.length ? lastSel : [v.length, v.length]; };
-  const insideCartouche = () => inCartouche(textEl.value.slice(0, selectionNow()[0]));
+  const beforeCaret = () => textEl.value.slice(0, selectionNow()[0]);
+  const insideCartouche = () => inCartouche(beforeCaret());
   function syncSheet() {
     if (cartoucheTile) cartoucheTile.querySelector(".wt-w").textContent = insideCartouche() ? "]" : "[ ]";
+    if (longTile) longTile.querySelector(".wt-w").textContent = inLong(beforeCaret()) ? ")" : "( )";
     undoBtn.hidden = !undo.length;
   }
   // Typing, Recents or New changed the text under the sheet: its taps can no longer be undone, and the cartouche tile
@@ -1214,6 +1248,7 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
       el("span", { class: "wt-g", "aria-hidden": "true" }, sample), el("span", { class: "wt-w" }, mark), el("span", { class: "wt-m" }, gloss));
     if (kind) { t.type = "button"; t.addEventListener("click", () => tap(t, mark, kind)); }
     if (kind === "cartouche") cartoucheTile = t;
+    if (kind === "long") longTile = t;
     t.dataset.q = (mark + " " + gloss).toLowerCase();
     return t;
   }
@@ -1337,6 +1372,7 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
   function gloss(seg) {
     if (!seg.glyph) return "not toki pona, drawn as letters";
     if (seg.name) return "a name, one glyph per sound: " + [...seg.name.toLowerCase()].map((ch) => SOUND[ch]).filter(Boolean).join(" ");
+    if (seg.long) return "a long glyph: " + seg.long.head + (seg.long.rev ? " stretches back under " : " stretches under ") + seg.long.words;
     if (seg.t[0] === "[") return "a cartouche";
     if (!bare(seg.t)) return seg.t.includes(":") ? "a colon" : "ends the sentence, so a new line starts";
     return bare(seg.t).split(/[&+\-]/).map((p) => (MEANING.get(p) || []).join(" · ")).filter(Boolean).join(" + ");
@@ -1419,12 +1455,12 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
     ring.classList.add("show");
     // The bubble over the word: the glyph as the image draws it, and the word as it is drawn, or as typed for a name,
     // a cartouche or plain letters. TRAIL would strip a cartouche's closing bracket, so that one is taken whole.
-    const raw = textEl.value.slice(s.from, s.to), typed = s.t[0] === "[" ? raw : bare(raw.replace(LEAD, ""));
+    const raw = textEl.value.slice(s.from, s.to), typed = s.t[0] === "[" || s.long ? raw : bare(raw.replace(LEAD, ""));
     popEl.replaceChildren(
       ...(s.glyph ? [el("span", { class: "wpop-glyph" }, s.t)] : []),
-      el("span", { class: "wpop-word" }, s.glyph && !s.name && s.t[0] !== "[" ? bare(s.t) || s.t : typed),
+      el("span", { class: "wpop-word" }, s.glyph && !s.name && !s.long && s.t[0] !== "[" ? bare(s.t) || s.t : typed),
       el("span", { class: "wpop-meaning" }, gloss(s)));
-    popEl.className = "wpop show" + (s.t[0] === "[" || !s.glyph ? " wide" : "");
+    popEl.className = "wpop show" + (s.t[0] === "[" || s.long || !s.glyph ? " wide" : "");
     const r = w.getClientRects()[0], f = fieldEl.getBoundingClientRect();
     const cx = r.left + r.width / 2 - f.left, pw = popEl.offsetWidth;
     popEl.style.left = Math.max(0, Math.min(cx - pw / 2, fieldEl.clientWidth - pw)) + "px";

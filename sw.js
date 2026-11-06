@@ -2,7 +2,7 @@
 // The sitelen pona font is embedded in index.html, so caching the shell is enough.
 // Bump CACHE with every deploy. The changed file is what makes the browser install this worker again,
 // and the page shows its Update banner once the new worker is installed and waiting.
-const CACHE = "ilo-sitelen-v38";
+const CACHE = "ilo-sitelen-v39";
 const PAGE = new URL("./", self.location.href).href;
 const SHELL = [
   PAGE,
