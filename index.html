@@ -623,7 +623,8 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
       // Only pi has a long form, in three fixed lengths (pi+, pi++, pi+++) that cover one, two and three glyphs. Other
       // long glyphs are drawn as their words, without the line.
       long: (L, ws) => (L.rev ? ws.join(" ") + " la" : L.head === "pi" ? "pi" + "+".repeat(Math.min(ws.length, 3)) + ws.join(" ") : L.head + " " + ws.join(" ")),
-      punct: (p) => p.replace(/,/g, "") },
+      // Its "." is a Latin period on the baseline; its middle dot (U+00B7) sits at the glyphs' middle, as sitelen pona's does.
+      punct: (p) => p.replace(/,/g, "").replace(/\./g, "·") },
     { id: "seli", name: "seli kiwen", family: "SeliKiwen", url: "fonts/sitelen-seli-kiwen.woff2",
       lacks: new Set(["te", "to"]), // U+F199E is in the font but draws nothing
       word: (w) => UCSUR.get(w),
