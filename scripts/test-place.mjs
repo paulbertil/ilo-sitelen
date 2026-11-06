@@ -49,6 +49,18 @@ t("syllable tick snaps to the glyph in a cartouche", place("[pona", 5, 5, ",", "
 t("a second tick follows the first", place("[pona,", 6, 6, ",", "glue"), "[pona,,", 7);
 t("a tick before the ] keeps the ]", place("[pona]", 5, 5, ",", "glue"), "[pona,]", 6);
 t("other glue marks still refuse to follow a tick", place("[pona,", 6, 6, "&", "glue"), "[pona,", 6);
+
+// long glyphs
+t("( ) snaps onto the word before", place("jan pi", 6, 6, "", "long"), "jan pi()", 7);
+t("( ) after a trailing space still snaps", place("jan pi ", 7, 7, "", "long"), "jan pi()", 7);
+t("( ) in an empty box opens a group", place("", 0, 0, "", "long"), "()", 1);
+t("( ) after punctuation gets a space, no snap", place("mi moku.", 8, 8, "", "long"), "mi moku. ()", 10);
+t("( ) wraps a selection onto the word before", place("jan pi toki pona", 7, 16, "", "long"), "jan pi(toki pona) ", 18);
+t("( ) wraps a selection at the start", place("tenpo ni la", 0, 8, "", "long"), "(tenpo ni) la", 10);
+t("inside a group it steps out past the )", place("jan pi(toki pona) li", 16, 16, "", "long"), "jan pi(toki pona) li", 18);
+t("inside an open group it closes it", place("jan pi(toki pona", 16, 16, "", "long"), "jan pi(toki pona) ", 18);
+t("a word after ( gets no space", place("pi(", 3, 3, "toki", "word"), "pi(toki ", 8);
+t("a word before ) gets no space", place("pi()", 3, 3, "toki", "word"), "pi(toki)", 7);
 t("glue after a full stop leaves it alone", place("toki.", 5, 5, "&", "glue"), "toki.", 5);
 t("glue after a glue mark leaves it alone", place("toki&", 5, 5, "-", "glue"), "toki&", 5);
 t("glue after [ leaves it alone", place("[", 1, 1, "&", "glue"), "[", 1);
