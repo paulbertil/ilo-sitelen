@@ -620,12 +620,17 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
       word: (w) => w,
       join: { "&": "-", "-": "-", "+": "+" },
       cart: (ws) => "[" + ws.map((w) => "_" + w).join("") + "]",
+      // Only pi has a long form, in three fixed lengths (pi+, pi++, pi+++) that cover one, two and three glyphs. Other
+      // long glyphs are drawn as their words, without the line.
+      long: (L, ws) => (L.rev ? ws.join(" ") + " la" : L.head === "pi" ? "pi" + "+".repeat(Math.min(ws.length, 3)) + ws.join(" ") : L.head + " " + ws.join(" ")),
       punct: (p) => p.replace(/,/g, "") },
     { id: "seli", name: "seli kiwen", family: "SeliKiwen", url: "fonts/sitelen-seli-kiwen.woff2",
       lacks: new Set(["te", "to"]), // U+F199E is in the font but draws nothing
       word: (w) => UCSUR.get(w),
       join: { "&": "‍", "-": "\u{F1995}", "+": "\u{F1996}" },
       cart: (ws) => "\u{F1990}" + ws.map((w) => UCSUR.get(w)).join("") + "\u{F1991}",
+      // UCSUR long glyphs: head, start, the glyphs, end; reversed: start, the glyphs, end, la.
+      long: (L, ws) => (L.rev ? "\u{F199A}" + ws.join("") + "\u{F199B}" + UCSUR.get("la") : UCSUR.get(L.head) + "\u{F1997}" + ws.join("") + "\u{F1998}"),
       punct: (p) => p.replace(/,/g, "").replace(/\./g, "\u{F199C}").replace(/:/g, "\u{F199D}") },
   ];
   const fontOf = (id) => FONTS.find((f) => f.id === id) || FONTS[0];
@@ -641,11 +646,17 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
     return null;
   }
   // A glyph segment spelled for font f, or null when f cannot draw all of it.
-  // Long glyphs, pi(toki pona), are nasin nanpa only for now; so are syllable ticks in a cartouche, [pona,,], since
-  // a comma does not split into words.
+  // A long glyph, pi(toki pona), is spelled from its words, each spelled on its own; the font's long() joins them.
+  // Syllable ticks in a cartouche, [pona,,], stay with nasin nanpa, since a comma does not split into words.
   function spell(seg, f) {
-    if (seg.long) return null;
     const can = (w) => WORDS.has(w) && !f.lacks.has(w);
+    if (seg.long) {
+      const inner = parseLine(seg.long.words, false);
+      if (!inner.length || inner.some((s) => !s.glyph)) return null;
+      const ws = inner.map((s) => spell(s, f));
+      if (ws.some((w) => w == null) || !(seg.long.rev || can(seg.long.head))) return null;
+      return f.long(seg.long, ws);
+    }
     if (seg.t[0] === "[") {
       const end = seg.t.indexOf("]"), inner = seg.t.slice(1, end);
       const ws = (seg.parts || [inner]).map(splitWords);
@@ -837,17 +848,30 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
     const maxW = size * maxGlyphs;
     const gap = size * 0.3;
     const rows = [];
+    // A row is room for glyphs 0.55 em above and below its middle. A glyph in another font can reach further, like the
+    // low line of a long glyph in seli kiwen, so the row takes the overflow as extra room above (up) and below (down).
+    // nasin nanpa segments are not measured for this, so its images keep their spacing.
+    const reach = 0.6 * size;
+    const push = (segs, w) => {
+      let up = 0, down = 0;
+      for (const s of segs) if (s.ink) { up = Math.max(up, s.ink.up - reach); down = Math.max(down, s.ink.down - reach); }
+      rows.push({ segs, w, up, down });
+    };
+    ctx.textBaseline = "middle";
     for (const segs of lines) {
       let row = [], w = 0;
       for (const seg of segs) {
         seg.run = runFor(seg, size, font);
         ctx.font = seg.run.font;
-        seg.w = ctx.measureText(seg.run.text).width;
+        const m = ctx.measureText(seg.run.text);
+        seg.w = m.width;
+        seg.ink = seg.run.family && seg.run.family !== FONT
+          ? { up: m.actualBoundingBoxAscent - seg.run.dy, down: m.actualBoundingBoxDescent + seg.run.dy } : null;
         const add = (row.length ? gap : 0) + seg.w;
-        if (row.length && w + add > maxW) { rows.push({ segs: row, w }); row = [seg]; w = seg.w; }
+        if (row.length && w + add > maxW) { push(row, w); row = [seg]; w = seg.w; }
         else { row.push(seg); w += add; }
       }
-      rows.push({ segs: row, w });
+      push(row, w);
     }
     return { rows, gap };
   }
@@ -882,7 +906,8 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
     const contentW = Math.max(size, ...rows.map((r) => r.w));
     const c = document.createElement("canvas");
     c.width = Math.ceil(contentW + pad * 2);
-    c.height = Math.ceil(rows.length * lineH - (lineH - size * 1.1) + pad * 2);
+    const extra = rows.reduce((n, r) => n + r.up + r.down, 0);
+    c.height = Math.ceil(rows.length * lineH - (lineH - size * 1.1) + pad * 2 + extra);
     const g = c.getContext("2d");
     g.fillStyle = st.bg;
     g.fillRect(0, 0, c.width, c.height);
@@ -890,9 +915,12 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
     if (empty) g.globalAlpha = 0.25;
     g.textBaseline = "middle";
     c.boxes = []; // where each segment landed, in canvas pixels, for the glyph tap
+    let shift = 0; // the extra room of the rows so far
     rows.forEach((row, i) => {
       let x = pad;
-      const y = pad + i * lineH + size * 0.55;
+      shift += row.up;
+      const y = pad + i * lineH + size * 0.55 + shift;
+      shift += row.down;
       for (const seg of row.segs) {
         g.font = seg.run.font;
         g.fillText(seg.run.text, x, y + seg.run.dy);
