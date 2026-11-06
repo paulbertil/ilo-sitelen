@@ -13,7 +13,8 @@ A small installable web app (PWA). No build step, no backend: everything happens
 - Tap a glyph in the preview to see which word it is: the glyph and its word get the same ochre ring, and a bubble over the word shows the glyph, the word and its meaning. Tap the glyph again, tap anywhere else, or edit the text to clear it.
 - Punctuation follows sitelen pona conventions: `.` becomes the middle dot, `:` the colon glyph, `?` and `!` are kept, commas are dropped.
 - Each sentence starts on its own line, like handwritten sitelen pona. Can be turned off.
-- **Settings** open from the chip at the bottom left of the preview, as a list in a dialog with a line of help per row: three sizes and three colors, each as a full-width pill of three buttons, where the Theme color, the default, draws the image Dark while the app is dark and White while it is light, and Dark and White stay as they are; and switches for names and lines. Settings are remembered between visits.
+- **Settings** open from the chip at the bottom left of the preview, as a list in a dialog with a line of help per row: three sizes and three colors, each as a full-width pill of three buttons, where the Theme color, the default, draws the image Dark while the app is dark and White while it is light, and Dark and White stay as they are; a Font row of three cards, nasin nanpa, linja pona and seli kiwen, each showing the start of your message in that font; and switches for names and lines. Settings are remembered between visits.
+- **Fonts**: nasin nanpa is built in and reads the app's notation as typed. linja pona and sitelen seli kiwen load from `fonts/` the first time they are used, and are kept for offline use from then on. Each gets the message spelled its own way (linja pona's ligatures, seli kiwen's UCSUR code points) and scaled to nasin nanpa's glyph height. A segment the chosen font cannot draw, a word it lacks (linja pona has no majuna or powe) or an alternate glyph like `mute1`, is drawn in nasin nanpa. The cheat sheet, the tap bubble and Recents use the font too; a recent keeps the font it was sent in.
 - Light or dark: the app follows your device, and the button in the top bar flips it: it shows pimeja while the app is light and walo while it is dark. Flip back to what your device shows and it follows the device again.
 - Works offline once installed. An install banner explains how on iOS, Android and desktop.
 - Opens from its cache, so it starts at once. When a new version is out, an Update banner offers it: one tap and the app reloads on the new version, message kept.
@@ -32,8 +33,9 @@ A small installable web app (PWA). No build step, no backend: everything happens
 | File | Purpose |
 | --- | --- |
 | `index.html` | The whole app: markup, styles, logic, and the embedded font |
+| `fonts/` | The two fonts that load on demand, as woff2, with their licenses. `linja-pona.woff2` is linja pona 4.9 converted as is; `sitelen-seli-kiwen.woff2` is the juniko build of sitelen seli kiwen 2.3, cut down to ASCII, the joiners and the sitelen pona code points |
 | `manifest.webmanifest` | PWA manifest (name, icons, standalone display) |
-| `sw.js` | Service worker that serves the app shell from cache and hands over to a new version when the user taps Update. Bump `CACHE` with every deploy |
+| `sw.js` | Service worker that serves the app shell from cache and hands over to a new version when the user taps Update. Bump `CACHE` with every deploy. Font files go in their own cache, `FONTS`, kept across versions: bump it when a font file changes |
 | `icons/` | App icons, rendered from the font's `ilo` glyph |
 | `scripts/` | `og.html` draws the link card image; `test-place.mjs` checks where a cheat sheet tap lands |
 
@@ -55,6 +57,6 @@ node scripts/test-place.mjs
 
 ## Credits
 
-Glyphs come from the [nasin nanpa](https://github.com/ETBCOR/nasin-nanpa) font by jan Itan, MIT licensed.
+Glyphs come from the [nasin nanpa](https://github.com/ETBCOR/nasin-nanpa) font by jan Itan, MIT licensed, the [linja pona](https://github.com/janSame/linja-pona) font by jan Same and David A Roberts, and the [sitelen seli kiwen](https://github.com/kreativekorp/sitelen-seli-kiwen) font by jan Lepeka (Rebecca Bettencourt). linja pona and sitelen seli kiwen are under the SIL Open Font License 1.1; the license texts are in `fonts/`.
 
 Word meanings in the cheat sheet follow Sonja Lang's public-domain dictionary in *Toki Pona: The Language of Good* (2014) and her word data at [tokipona.org/nimi_pu.txt](https://tokipona.org/nimi_pu.txt) and [tokipona.org/nimi_pi_pu_ala.txt](https://tokipona.org/nimi_pi_pu_ala.txt). Which words count as rare follows [lipu Linku](https://linku.la)'s 2026 word survey.

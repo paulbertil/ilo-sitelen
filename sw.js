@@ -1,8 +1,10 @@
 // ilo sitelen service worker: keeps the app usable offline.
-// The sitelen pona font is embedded in index.html, so caching the shell is enough.
+// The default sitelen pona font is embedded in index.html, so caching the shell is enough to start. The other fonts
+// in fonts/ are cached the first time the page asks for one, in their own cache that outlives a new version.
 // Bump CACHE with every deploy. The changed file is what makes the browser install this worker again,
-// and the page shows its Update banner once the new worker is installed and waiting.
-const CACHE = "ilo-sitelen-v35";
+// and the page shows its Update banner once the new worker is installed and waiting. Bump FONTS when a font file changes.
+const CACHE = "ilo-sitelen-v36";
+const FONTS = "ilo-sitelen-fonts-v1";
 const PAGE = new URL("./", self.location.href).href;
 const SHELL = [
   PAGE,
@@ -23,7 +25,7 @@ self.addEventListener("activate", (event) => {
   // Old caches go, and the first worker takes the pages that loaded before it existed. Neither step waits on the other.
   event.waitUntil(Promise.all([
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
+      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE && k !== FONTS).map((k) => caches.delete(k))))
       .catch(() => {}),
     self.clients.claim(),
   ]));
@@ -45,6 +47,18 @@ self.addEventListener("fetch", (event) => {
     // the one cached copy. A new version ships with a new CACHE name, and the page offers to switch once that worker
     // is installed. Other same-origin requests (og-2.png, the sitemap, a 404 route) go to the network as usual.
     const plain = url.origin + url.pathname;
+    if (plain.startsWith(new URL("./fonts/", self.location.href).href)) {
+      // A font file: from its cache once fetched; it only changes with a new file name or a new FONTS cache.
+      event.respondWith(
+        caches.open(FONTS).then((cache) =>
+          cache.match(plain).then((hit) => hit || fetch(req).then((res) => {
+            if (res.ok) event.waitUntil(cache.put(plain, res.clone()).catch(() => {}));
+            return res;
+          }))
+        )
+      );
+      return;
+    }
     const isPage = req.mode === "navigate" && (plain === PAGE || plain === PAGE + "index.html");
     if (!isPage && !SHELL.includes(plain)) return;
     const key = isPage ? PAGE : plain;
