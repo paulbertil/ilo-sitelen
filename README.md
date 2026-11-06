@@ -24,7 +24,7 @@ A small installable web app (PWA). No build step, no backend: everything happens
 
 - Write names with a capital letter, or build a cartouche yourself: `[mama ala lipu ilo]`.
 - Join glyphs with `&`, stack with `-`, scale with `+`: `toki&pona`.
-- Add `1` after a word for its alternate glyph: `mute1`, `sewi1`. The arrow of `ni` turns with `ni1` to `ni8`.
+- Add `1` after a word for its alternate glyph, or a higher number where there are more: `mute1`, `sewi1`, `ni3`.
 - In a cartouche, a comma after a glyph reads a syllable instead of the first letter: `[pona,,]` is Pona.
 - A sentence ending in `.`, `!` or `?` starts a new line in the image. A line break in the text does too.
 
