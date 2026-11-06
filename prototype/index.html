@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Prototype: sending a changed message</title>
+<style>
+  /* PROTOTYPE: goes, with the ?variant= code in index.html, once one behaviour is chosen. */
+  :root { --bg: #f5ecd7; --fg: #121110; --muted: #5a5243; --line: #121110; --accent: #e8c583; --accent-ink: #121110; color-scheme: light; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #24201a; --fg: #f5ecd7; --muted: #c8bc9f; --line: #f5ecd7; color-scheme: dark; } }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 600 16px/1.5 "Avenir Next Rounded", ui-rounded, system-ui, sans-serif; }
+  main { max-width: 560px; margin: 0 auto; padding: 20px 16px 48px; }
+  h1 { font-size: 1.35rem; line-height: 1.25; margin: 0 0 6px; }
+  p { margin: 0 0 12px; }
+  .lead { color: var(--muted); }
+  section { border: 3px solid var(--line); border-radius: 22px; padding: 14px 16px 16px; margin-top: 16px; }
+  h2 { font-size: 1.1rem; margin: 0 0 4px; }
+  .what { color: var(--muted); font-size: 0.95rem; }
+  ol { margin: 0 0 14px; padding-left: 1.3em; font-size: 0.95rem; }
+  li { margin-bottom: 4px; }
+  a.go { display: inline-block; padding: 11px 18px; border: 3px solid var(--line); border-radius: 999px; background: var(--accent); color: var(--accent-ink); font-weight: 700; text-decoration: none; }
+  .note { margin-top: 20px; font-size: 0.88rem; color: var(--muted); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Sending a changed message: three behaviours</h1>
+  <p class="lead">You open a message from Recents, change a word and send it again. What should happen to the card? Try each one with the same steps and pick by feel. All three share the same Recents.</p>
+
+  <section>
+    <h2>A. Ask on send</h2>
+    <p class="what">Copy turns into two buttons, &ldquo;Copy and replace&rdquo; and &ldquo;Copy as new&rdquo;. Nothing is sent until you choose.</p>
+    <ol>
+      <li>Open a message from Recents and change a word.</li>
+      <li>Tap Copy. Pick one of the two buttons.</li>
+      <li>Do it again and tap somewhere else instead: the question goes away.</li>
+    </ol>
+    <a class="go" href="../?variant=send">Try A</a>
+  </section>
+
+  <section>
+    <h2>B. Ask on leaving</h2>
+    <p class="what">Copy always copies at once and leaves Recents alone. When you tap New or another card, a dialog asks: save the changes, save as new, or discard.</p>
+    <ol>
+      <li>Open a message from Recents and change a word.</li>
+      <li>Tap Copy. Look at Recents: the card still shows the old text.</li>
+      <li>Tap New, or another card. Answer the dialog.</li>
+      <li>Do it again, copy, then close the tab and come back: the question is still waiting.</li>
+    </ol>
+    <a class="go" href="../?variant=leave">Try B</a>
+  </section>
+
+  <section>
+    <h2>C. Quiet, with &ldquo;Keep both&rdquo;</h2>
+    <p class="what">Copy always copies at once and updates the card you opened. The toast stays up for seven seconds with a &ldquo;Keep both&rdquo; button that brings the old card back beside the new one.</p>
+    <ol>
+      <li>Open a message from Recents and change a word.</li>
+      <li>Tap Copy. The card now shows the new text.</li>
+      <li>Do it again and tap &ldquo;Keep both&rdquo; in the toast.</li>
+    </ol>
+    <a class="go" href="../?variant=quiet">Try C</a>
+  </section>
+
+  <p class="note">In all three: sending the same text again just moves the card to the top, a brand new message becomes a card on its first send, and New or an emptied box starts a separate message. Over plain http on the home network, Copy and Share are not allowed by the browser, so use Save there, or the https preview.</p>
+</main>
+</body>
+</html>

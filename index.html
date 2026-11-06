@@ -230,6 +230,25 @@ button:active, .btn:active { transform: scale(0.98); }
 /* The settings chip sits at the bottom left of the frame, across from the send chips. It opens the settings dialog. */
 .opts-btn { position: absolute; left: 12px; bottom: 12px; width: 42px; height: 42px; padding: 0; border-radius: 50%; }
 .opts-btn svg { width: 18px; height: 18px; }
+/* When the box belongs to a Recents card but says something else, a send asks first: the chips give way to
+   "<verb> and replace" / "<verb> as new" across the frame's bottom strip, and nothing is sent until one is tapped. */
+.ask { position: absolute; left: 12px; right: 12px; bottom: 12px; display: flex; justify-content: flex-end; gap: 6px; }
+.ask button { height: 42px; padding: 0 14px; font-size: 0.9rem; flex: 0 1 auto; min-width: 0; white-space: nowrap; }
+.ask[hidden] { display: none; }
+.stage.asking .actions, .stage.asking .opts-btn { visibility: hidden; }
+/* PROTOTYPE: three behaviours for sending a changed message, picked by ?variant=send|leave|quiet. Everything marked
+   PROTOTYPE goes, with prototype/, once one is chosen. The bar switches between them, the dialog is the "leave"
+   variant's question, and the toast button is the "quiet" variant's way back. */
+.proto-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 12px; font-size: 0.78rem; color: var(--muted); }
+.proto-bar a { padding: 5px 10px; border: 2px solid var(--line); border-radius: 999px; color: var(--fg); text-decoration: none; }
+.proto-bar a.on { background: var(--accent); color: var(--accent-ink); }
+.leave-text { margin: 4px 0 14px; color: var(--muted); font-size: 0.95rem; line-height: 1.4; }
+.leave-text q { color: var(--fg); font-weight: 700; }
+.leave-acts { display: grid; gap: 8px; }
+#leave-drop { border-color: transparent; color: var(--muted); }
+.toast.has-action { display: inline-flex; align-items: center; gap: 10px; text-align: left; padding: 7px 8px 7px 18px; border-radius: 24px; }
+.toast.show.has-action { pointer-events: auto; }
+.toast-act { padding: 7px 12px; font-size: 0.85rem; background: var(--bg); color: var(--fg); border-color: var(--bg); flex: none; }
 
 /* ---- Settings: Size, Colors, Names and Lines as a list in a modal card opened from the chip in the preview frame.
    One row per setting: its glyph, its name, a line of help and the control, with a rule between rows. The page behind
@@ -477,6 +496,10 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
         <button class="round" id="share" type="button" aria-label="Share" title="Share" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m8 7 4-4 4 4"/><path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7"/></svg></button>
         <a class="btn round" id="save" download="sitelen-pona.png" href="#" aria-label="Save" title="Save" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></svg></a>
       </div>
+      <div class="ask" id="ask" role="group" aria-label="The text has changed since this message was sent" hidden>
+        <button type="button" id="ask-replace" title="Replace that message in Recents with this one"></button>
+        <button type="button" id="ask-new" title="Keep that message and add this one"></button>
+      </div>
     </div>
   </section>
 
@@ -502,7 +525,7 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
 
 <aside class="shelf" id="shelf" aria-label="Recents">
   <div class="s-top">
-    <div><h2>Recents</h2><p class="sub">What you sent, as you sent it.</p></div>
+    <div><h2>Recents</h2></div>
     <button type="button" class="s-new" id="s-new"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>New</button>
     <button type="button" class="icon-btn" id="s-close" aria-label="Hide recents" title="Hide recents"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9.5 4v16"/></svg></button>
   </div>
@@ -557,6 +580,18 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
   </label>
 </div>
 </dialog>
+<!-- PROTOTYPE (leave): asked when New or a card would replace a box that holds a changed message. -->
+<dialog class="opts" id="leave" aria-labelledby="leave-title">
+<div class="opts-card">
+  <div class="opts-bar"><h2 id="leave-title">Save your changes?</h2></div>
+  <p class="leave-text">You changed <q id="leave-old"></q>.</p>
+  <div class="leave-acts">
+    <button type="button" class="primary" id="leave-save">Save changes</button>
+    <button type="button" id="leave-new">Save as new</button>
+    <button type="button" id="leave-drop">Discard changes</button>
+  </div>
+</div>
+</dialog>
 <div class="scrim" id="scrim" hidden></div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
@@ -591,6 +626,22 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
   const recentsBtn = $("recents-btn"), shelfList = $("s-list"), scrimEl = $("scrim");
   // The "Check the cheat sheet." link in the Not toki pona line; render() needs it from the first paint.
   const sheetLink = el("button", { class: "linkbtn", type: "button", onclick: () => setSheet(true) }, "cheat sheet");
+
+  // PROTOTYPE: three behaviours for sending a changed message, picked by ?variant=. Everything marked PROTOTYPE goes,
+  // with prototype/, once one is chosen.
+  //   send:  ask in place of the chips before the send (the default)
+  //   leave: send without asking or recording; ask in a dialog when New or a card would replace the box
+  //   quiet: replace without asking; the toast offers "Keep both"
+  const variantParam = new URLSearchParams(location.search).get("variant");
+  const VARIANT = ["send", "leave", "quiet"].includes(variantParam) ? variantParam : "send";
+  if (variantParam) {
+    const bar = el("nav", { class: "proto-bar", "aria-label": "Prototype variants" }, "Prototype:");
+    for (const [v, name] of [["send", "Ask on send"], ["leave", "Ask on leaving"], ["quiet", "Quiet, keep both"]]) {
+      bar.append(el("a", { href: "?variant=" + v, class: v === VARIANT ? "on" : "" }, name));
+    }
+    bar.append(el("a", { href: "prototype/" }, "About"));
+    document.querySelector("main").prepend(bar);
+  }
 
   const store = {
     get(k, d) { try { const v = localStorage.getItem("ilo-sitelen:" + k); return v == null ? d : v; } catch { return d; } },
@@ -765,43 +816,104 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
 
   // ---------- actions ----------
   let toastTimer = 0;
-  function toast(msg) {
+  // PROTOTYPE (quiet): action, when given, is { label, run }, a button in the toast, which then stays up longer.
+  function toast(msg, action) {
     toastEl.textContent = msg;
+    if (action) toastEl.append(el("button", { class: "toast-act", type: "button", onclick: () => { hideToast(); action.run(); } }, action.label));
+    toastEl.classList.toggle("has-action", !!action);
     toastEl.classList.add("show");
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => toastEl.classList.remove("show"), 2800);
+    toastTimer = setTimeout(hideToast, action ? 7000 : 2800);
+  }
+  function hideToast() {
+    clearTimeout(toastTimer);
+    toastEl.classList.remove("show");
+    const b = toastEl.querySelector("button");
+    if (b) b.remove(); // a faded toast must not keep a button that the keyboard can still reach
   }
 
   function blobNow() { return currentBlob ? Promise.resolve(currentBlob) : renderPromise; }
 
-  copyBtn.addEventListener("click", async () => {
-    recordRecent();
+  // Copy, Share and Save all send. While the box belongs to a Recents card whose text has changed, the first tap only
+  // asks, "<verb> and replace" or "<verb> as new", and the chosen button runs go(mode) from its own tap, which is what
+  // Safari needs for the clipboard and the share sheet. Otherwise go(null) runs at once and recordRecent() decides.
+  function sendOrAsk(verb, go) {
+    if (!needsAsk()) { go(null); return true; }
+    // PROTOTYPE: "quiet" replaces without asking; "leave" sends without recording, and asks when the box is left.
+    if (VARIANT === "quiet") { go("replace"); return true; }
+    if (VARIANT === "leave") { go("hold"); return true; }
+    ask(verb, go); return false;
+  }
+
+  copyBtn.addEventListener("click", () => sendOrAsk("Copy", async (mode) => {
+    const undo = recordRecent(mode); // PROTOTYPE (quiet): the way back from a silent replace, or null
     try {
       if (!window.ClipboardItem || !navigator.clipboard?.write) throw new Error("unsupported");
       // Safari wants the promise handed over synchronously inside the tap.
       await navigator.clipboard.write([new ClipboardItem({ "image/png": blobNow() })]);
-      toast("Copied. Paste it in your chat.");
+      toast(undo ? "Copied. Updated in Recents." : "Copied. Paste it in your chat.", undo);
     } catch {
-      toast("Copying isn't allowed here. Press and hold the image, then tap Copy.");
+      toast("Copying isn't allowed here. Press and hold the image, then tap Copy.", undo);
     }
-  });
+  }));
 
   const probe = typeof File === "function" ? new File([new Blob()], "x.png", { type: "image/png" }) : null;
   if (probe && navigator.canShare && navigator.canShare({ files: [probe] })) {
     shareBtn.hidden = false;
-    shareBtn.addEventListener("click", async () => {
+    shareBtn.addEventListener("click", () => sendOrAsk("Share", async (mode) => {
       try {
         const blob = await blobNow();
         await navigator.share({ files: [new File([blob], "sitelen-pona.png", { type: "image/png" })] });
-        recordRecent();
+        const undo = recordRecent(mode);
+        if (undo) toast("Updated in Recents.", undo);
       } catch (e) {
         if (e && e.name === "AbortError") return;
         toast("Sharing isn't available here. Use Copy instead.");
       }
-    });
+    }));
   }
   if (!window.__IS_ARTIFACT__) saveLink.hidden = false;
-  saveLink.addEventListener("click", () => recordRecent());
+  // The link downloads by itself. When the send has to ask first, the download waits for the chosen button, which
+  // clicks the link again with the question answered.
+  let saveAnswered = false;
+  saveLink.addEventListener("click", (e) => {
+    if (saveAnswered) return;
+    let asked = false;
+    const straight = sendOrAsk("Save", (mode) => {
+      const undo = recordRecent(mode);
+      if (undo) toast("Updated in Recents.", undo);
+      if (asked) { saveAnswered = true; saveLink.click(); saveAnswered = false; }
+    });
+    asked = !straight;
+    if (asked) e.preventDefault();
+  });
+
+  // The question itself. Tapping anywhere else, Escape, or editing the text withdraws it with nothing sent.
+  const askEl = $("ask"), stageEl = $("stage"), askReplace = $("ask-replace"), askNew = $("ask-new");
+  let askGo = null, askFrom = null;
+  function ask(verb, go) {
+    askGo = go; askFrom = document.activeElement;
+    askReplace.textContent = verb + " and replace";
+    askNew.textContent = verb + " as new";
+    askEl.hidden = false; stageEl.classList.add("asking");
+    askReplace.focus({ preventScroll: true });
+  }
+  function cancelAsk() {
+    if (!askGo) return;
+    askGo = null; askEl.hidden = true; stageEl.classList.remove("asking");
+  }
+  function answerAsk(mode) {
+    const go = askGo;
+    cancelAsk();
+    if (askFrom && askFrom.focus) askFrom.focus({ preventScroll: true });
+    go(mode);
+  }
+  askReplace.addEventListener("click", () => answerAsk("replace"));
+  askNew.addEventListener("click", () => answerAsk("new"));
+  document.addEventListener("pointerdown", (e) => { if (askGo && !askEl.contains(e.target)) cancelAsk(); });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && askGo) { e.preventDefault(); cancelAsk(); if (askFrom && askFrom.focus) askFrom.focus(); }
+  });
 
   // ---------- options ----------
   const sizeGroup = $("size");
@@ -863,7 +975,12 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
   const remember = () => { lastSel = [textEl.selectionStart, textEl.selectionEnd]; };
   for (const ev of ["keyup", "click", "select", "input", "blur"]) textEl.addEventListener(ev, remember);
 
-  textEl.addEventListener("input", () => { store.set("text", textEl.value); scheduleRender(); syncActive(); textChanged(); });
+  textEl.addEventListener("input", () => {
+    store.set("text", textEl.value); scheduleRender();
+    cancelAsk();
+    if (!textEl.value.trim()) setAttached(null); // an empty box is the New state
+    syncActive(); textChanged();
+  });
 
   // ---------- light or dark ----------
   // The app follows the device until the toggle is used. A choice is kept, and the script in <head> applies it before the
@@ -893,10 +1010,12 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
   function boot() { fontsReady = true; render(); renderShelf(); }
   document.fonts.load(`64px ${FONT}`, "toki").then(boot, boot);
 
-  // ---------- recents: what you sent, as you sent it ----------
-  // Copy, Share and Save count as sending. Each entry keeps the text and the four settings, never the PNG; the image
+  // ---------- recents: what you sent ----------
+  // Copy, Share and Save count as sending. Each card keeps the text and the four settings, never the PNG; the image
   // is drawn again when needed. One localStorage key, newest first, capped. On a Safari tab on iOS all of this
   // storage goes after 7 days of Safari use without a tap here; a Home Screen app is exempt, hence the footer note.
+  // The box belongs to at most one card, the one opened from the shelf or last sent: sending the same text again
+  // updates that card, sending changed text asks first (sendOrAsk above), and New or an emptied box lets go of it.
   const standalone = matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
   const iOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
   const RECENTS_MAX = 50;
@@ -905,14 +1024,19 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
   const ICON_COPY = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>';
   const ICON_TRASH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16"/><path d="M10 11v6M14 11v6"/><path d="M6 7l1 13h10l1-13"/><path d="M9 7V4h6v3"/></svg>';
 
+  const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+  let idsAdded = false;
   function loadRecents() {
     try {
       const list = JSON.parse(store.get("recents", "[]"));
-      return Array.isArray(list) ? list.filter((r) => r && typeof r.text === "string" && typeof r.at === "number").slice(0, RECENTS_MAX) : [];
+      if (!Array.isArray(list)) return [];
+      return list.filter((r) => r && typeof r.text === "string" && typeof r.at === "number").slice(0, RECENTS_MAX)
+        .map((r) => { if (typeof r.id !== "string") { r.id = newId(); idsAdded = true; } return r; });
     } catch { return []; }
   }
   let recents = loadRecents();
   const saveRecents = () => store.set("recents", JSON.stringify(recents));
+  if (idsAdded) saveRecents(); // cards saved before ids existed get one now, so an attachment to them survives a reload
   const settingsOf = (r) => ({
     size: SIZES[r.size] ? r.size : "s",
     style: STYLES.some((s) => s.id === r.style) ? r.style : "night",
@@ -920,19 +1044,62 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
     sentences: r.sentences !== false,
   });
 
-  function recordRecent(entry) {
-    const e = entry || { text: textEl.value.trim(), size: state.size, style: styleId(state.style), names: state.names, sentences: state.sentences };
-    if (!e.text) return;
-    const i = recents.findIndex((r) => r.text === e.text);
-    if (i >= 0) recents.splice(i, 1);
-    recents.unshift({ text: e.text, size: e.size, style: e.style, names: e.names, sentences: e.sentences, at: Date.now() });
+  // The card the box belongs to, by id. Opening a card or sending attaches; New, an emptied box or removing the card
+  // detaches. Kept beside the draft so a reload keeps it.
+  let attachedId = store.get("attached", null);
+  if (!recents.some((r) => r.id === attachedId)) attachedId = null;
+  const attached = () => recents.find((r) => r.id === attachedId) || null;
+  function setAttached(id) {
+    attachedId = id;
+    if (id) store.set("attached", id); else store.remove("attached");
+    syncActive();
+  }
+  // A send asks first when the box belongs to a card but says something else.
+  const needsAsk = () => { const a = attached(), t = textEl.value.trim(); return !!a && !!t && a.text !== t; };
+
+  // Writes the box into Recents. mode is "replace" (overwrite the attached card), "new" (a card beside it) or null: the
+  // attached card when its text is unchanged, otherwise the card that says the same thing, or a fresh one. One card per
+  // text, so another card saying the same thing gives way. The written card goes to the top and the box belongs to it.
+  function recordRecent(mode) {
+    const text = textEl.value.trim();
+    if (!text || mode === "hold") return null; // PROTOTYPE (leave): "hold" sends a changed message without recording it
+    const a = attached();
+    // PROTOTYPE (quiet): the list before a silent replace, so the toast can offer to keep both.
+    const before = VARIANT === "quiet" && mode === "replace" ? JSON.stringify(recents) : null;
+    const card = (a && mode !== "new" && (mode === "replace" || a.text === text)) ? a : (recents.find((r) => r.text === text) || { id: newId() });
+    recents = recents.filter((r) => r !== card && r.text !== text);
+    Object.assign(card, { text, size: state.size, style: styleId(state.style), names: state.names, sentences: state.sentences, at: Date.now() });
+    recents.unshift(card);
     if (recents.length > RECENTS_MAX) recents.length = RECENTS_MAX;
     saveRecents();
+    setAttached(card.id);
     renderShelf();
     if (store.get("persist-asked", "0") !== "1") {
       store.set("persist-asked", "1");
       try { navigator.storage?.persist?.().catch(() => {}); } catch {}
     }
+    return before ? { label: "Keep both", run: () => keepBoth(before, card.id) } : null;
+  }
+  // PROTOTYPE (quiet): take back a silent replace. The list goes back to what it was, and what was sent becomes a card
+  // of its own at the top, which the box follows if it still belonged to the replaced card.
+  function keepBoth(before, id) {
+    const sent = recents.find((r) => r.id === id);
+    if (!sent) return;
+    const fresh = { ...sent, id: newId() };
+    recents = JSON.parse(before).filter((r) => r.text !== fresh.text);
+    recents.unshift(fresh);
+    if (recents.length > RECENTS_MAX) recents.length = RECENTS_MAX;
+    saveRecents();
+    if (attachedId === id) setAttached(fresh.id);
+    renderShelf();
+    toast("Kept both.");
+  }
+  // Copying a card's image from the shelf sends it again: it moves to the top, and the box stays as it is.
+  function touch(r) {
+    recents = recents.filter((x) => x.id !== r.id);
+    r.at = Date.now();
+    recents.unshift(r);
+    saveRecents(); renderShelf();
   }
 
   const thumbs = new Map();
@@ -977,7 +1144,7 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
   }
 
   let cards = [];
-  let pendingDelete = null; // text of the card asking "Remove this message?"
+  let pendingDelete = null; // id of the card asking "Remove this message?"
   function renderShelf() {
     if (!fontsReady) return;
     shelfList.replaceChildren();
@@ -991,7 +1158,7 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
       const g = groupOf(r.at);
       if (g !== group) { group = g; shelfList.append(el("div", { class: "s-day" }, g)); }
       let meta;
-      if (pendingDelete === r.text) {
+      if (pendingDelete === r.id) {
         meta = el("div", { class: "card-meta" },
           el("span", { class: "card-text" }, "Remove this message?"),
           el("button", { class: "card-act danger", type: "button", onclick: () => deleteRecent(r) }, "Remove"),
@@ -999,7 +1166,7 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
       } else {
         const copy = el("button", { class: "card-copy", type: "button", "aria-label": "Copy this image", title: "Copy image", onclick: () => copyRecent(r) });
         copy.innerHTML = ICON_COPY;
-        const del = el("button", { class: "card-copy card-del", type: "button", "aria-label": "Remove from Recents", title: "Remove", onclick: () => { pendingDelete = r.text; renderShelf(); } });
+        const del = el("button", { class: "card-copy card-del", type: "button", "aria-label": "Remove from Recents", title: "Remove", onclick: () => { pendingDelete = r.id; renderShelf(); } });
         del.innerHTML = ICON_TRASH;
         meta = el("div", { class: "card-meta" },
           el("span", { class: "card-text", title: r.text }, firstLine(r.text)),
@@ -1007,22 +1174,24 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
           copy, del);
       }
       const card = el("article", { class: "card" },
-        el("button", { class: "card-img", type: "button", "aria-label": "Open: " + firstLine(r.text), onclick: () => openRecent(r) }, el("img", { src: thumbUrl(r), alt: "" })),
+        el("button", { class: "card-img", type: "button", "aria-label": "Open: " + firstLine(r.text), onclick: () => leaving(() => openRecent(r)) }, el("img", { src: thumbUrl(r), alt: "" })),
         meta);
       cards.push([card, r]);
       shelfList.append(card);
     }
     syncActive();
   }
-  // The card whose message is in the box right now.
+  // The card the box belongs to; without one, the card saying what the box says, which is the one a send would update.
   function syncActive() {
     const cur = textEl.value.trim();
-    for (const [card, r] of cards) card.classList.toggle("active", r.text === cur);
+    for (const [card, r] of cards) card.classList.toggle("active", attachedId ? r.id === attachedId : r.text === cur);
   }
 
   function openRecent(r) {
     const o = settingsOf(r);
+    cancelAsk();
     textEl.value = r.text; store.set("text", r.text); lastSel = null; textChanged();
+    setAttached(r.id);
     state.size = o.size; state.names = o.names; state.sentences = o.sentences;
     store.set("size", state.size);
     store.set("names", state.names ? "1" : "0"); store.set("sentences", state.sentences ? "1" : "0");
@@ -1032,14 +1201,16 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
     if (!wide.matches) setShelf(false);
   }
   function deleteRecent(r) {
-    const i = recents.findIndex((x) => x.text === r.text);
-    if (i >= 0) recents.splice(i, 1);
+    recents = recents.filter((x) => x.id !== r.id);
+    if (r.id === attachedId) setAttached(null);
     pendingDelete = null;
     saveRecents(); renderShelf();
     toast("Removed from Recents.");
   }
   function newMessage() {
+    cancelAsk();
     textEl.value = ""; store.set("text", ""); lastSel = null; textChanged();
+    setAttached(null);
     render(); syncActive();
     if (!wide.matches) setShelf(false);
     textEl.focus();
@@ -1055,7 +1226,7 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
     } catch {
       toast("Copying isn't allowed here. Open it, then press and hold the image.");
     }
-    recordRecent({ text: r.text, ...o });
+    touch(r);
   }
 
   let shelfOpen = false;
@@ -1075,7 +1246,30 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
   const syncShelf = () => { if (wide.matches && shelfOpen !== wantsShelf()) setShelf(wantsShelf()); };
   recentsBtn.addEventListener("click", () => { setShelf(true); if (!wide.matches) $("s-close").focus(); });
   $("s-close").addEventListener("click", () => { setShelf(false); recentsBtn.focus(); });
-  $("s-new").addEventListener("click", newMessage);
+  $("s-new").addEventListener("click", () => leaving(newMessage));
+
+  // PROTOTYPE (leave): New or a card is about to replace a box that belongs to a card but says something else. The
+  // dialog settles that change first (save it over the card, save it as a new card, or drop it), then the tap goes
+  // ahead. Escape or a tap outside closes the dialog and stays.
+  const leaveEl = $("leave");
+  let leaveNext = null;
+  function leaving(next) {
+    if (VARIANT !== "leave" || !needsAsk()) { next(); return; }
+    leaveNext = next;
+    $("leave-old").textContent = firstLine(attached().text);
+    leaveEl.showModal();
+  }
+  function settleLeave(mode) {
+    const next = leaveNext;
+    leaveNext = null; leaveEl.close();
+    if (mode) recordRecent(mode);
+    if (next) next();
+  }
+  $("leave-save").addEventListener("click", () => settleLeave("replace"));
+  $("leave-new").addEventListener("click", () => settleLeave("new"));
+  $("leave-drop").addEventListener("click", () => settleLeave(null));
+  leaveEl.addEventListener("click", (e) => { if (e.target === leaveEl) leaveEl.close(); });
+  leaveEl.addEventListener("close", () => { leaveNext = null; });
   scrimEl.addEventListener("click", () => setShelf(false));
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && shelfOpen && !wide.matches) { setShelf(false); recentsBtn.focus(); } });
   wide.addEventListener("change", () => { setShelf(wantsShelf()); syncSheetMode(); });
@@ -1173,7 +1367,9 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
   function textChanged() { undo = []; if (sheetOpen) syncSheet(); }
   function putText(value, sel) {
     textEl.value = value; lastSel = sel;
-    store.set("text", value); scheduleRender(); syncActive();
+    store.set("text", value); scheduleRender();
+    if (!value.trim()) setAttached(null);
+    syncActive();
     // The wide palette hands the caret back to the box after every tap, so typing and tapping alternate.
     if (wide.matches && sel) { textEl.focus({ preventScroll: true }); textEl.setSelectionRange(sel[0], sel[1]); }
     syncSheet();
