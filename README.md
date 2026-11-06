@@ -9,12 +9,13 @@ A small installable web app (PWA). No build step, no backend: everything happens
 - Live preview that redraws as you type.
 - **Copy image** puts a PNG on the clipboard. **Share** and **Save** are also available on the installed app.
 - Capitalized words are treated as names and written in a cartouche, one glyph per sound. `jan Mali` becomes `[mama ala lipu ilo]`.
-- Words outside pu and ku suli get a dashed red underline in the box (the word still being typed is spared), are listed under it, and are drawn as plain letters.
+- Words the font cannot draw (outside pu, ku suli and the four ku lili linluwi, su, te and to) get a dashed red underline in the box (the word still being typed is spared), are listed under it, and are drawn as plain letters.
 - Tap a glyph in the preview to see which word it is: the glyph and its word get the same ochre ring, and a bubble over the word shows the glyph, the word and its meaning. Tap the glyph again, tap anywhere else, or edit the text to clear it.
-- Punctuation follows sitelen pona conventions: `.` becomes the middle dot, `:` the colon glyph, `?` and `!` are kept, commas are dropped.
+- Punctuation follows sitelen pona conventions: `.` becomes the middle dot, `:` the colon glyph, `?` and `!` are kept, commas are dropped. Inside a cartouche a comma stays: it is the syllable tick of nasin sitelen kalama pi linja lili, so `[pona,,]` reads Pona.
+- Long glyphs: `pi(toki pona)` stretches pi under the phrase, `(tenpo ni) la` stretches la back under it. The font has long forms for a, alasa, anu, awen, kama, ken, kepeken, la, lon, nanpa, open, pi, pini, sona, tawa, wile and n; a run with a word the font cannot draw, or with a name in it, falls apart into its words.
 - Each sentence starts on its own line, like handwritten sitelen pona. Can be turned off.
 - **Settings** open from the chip at the bottom left of the preview, as a list in a dialog with a line of help per row: three sizes and three colors, each as a full-width pill of three buttons, where the Theme color, the default, draws the image Dark while the app is dark and White while it is light, and Dark and White stay as they are; a Font row of three cards, nasin nanpa, linja pona and seli kiwen, each showing the start of your message in that font; and switches for names and lines. Settings are remembered between visits.
-- **Fonts**: nasin nanpa is built in and reads the app's notation as typed. linja pona and sitelen seli kiwen load from `fonts/` the first time they are used, and are kept for offline use from then on. Each gets the message spelled its own way (linja pona's ligatures, seli kiwen's UCSUR code points) and scaled to nasin nanpa's glyph height. A segment the chosen font cannot draw, a word it lacks (linja pona has no majuna or powe) or an alternate glyph like `mute1`, is drawn in nasin nanpa. The cheat sheet, the tap bubble and Recents use the font too; a recent keeps the font it was sent in.
+- **Fonts**: nasin nanpa is built in and reads the app's notation as typed. linja pona and sitelen seli kiwen load from `fonts/` the first time they are used, and are kept for offline use from then on. Each gets the message spelled its own way (linja pona's ligatures, seli kiwen's UCSUR code points) and scaled to nasin nanpa's glyph height. A segment the chosen font cannot draw is drawn in nasin nanpa: a word it lacks (linja pona has no majuna, powe, linluwi, su, te or to; seli kiwen has no to), an alternate glyph like `mute1`, a long glyph like `pi(toki pona)`, or a cartouche with syllable ticks. The cheat sheet, the tap bubble and Recents use the font too; a recent keeps the font it was sent in.
 - Light or dark: the app follows your device, and the button in the top bar flips it: it shows pimeja while the app is light and walo while it is dark. Flip back to what your device shows and it follows the device again.
 - Works offline once installed. An install banner explains how on iOS, Android and desktop.
 - Opens from its cache, so it starts at once. When a new version is out, an Update banner offers it: one tap and the app reloads on the new version, message kept.
@@ -25,7 +26,9 @@ A small installable web app (PWA). No build step, no backend: everything happens
 
 - Write names with a capital letter, or build a cartouche yourself: `[mama ala lipu ilo]`.
 - Join glyphs with `&`, stack with `-`, scale with `+`: `toki&pona`.
-- Add `1` after a word for its alternate glyph: `mute1`, `sewi1`.
+- Add `1` after a word for its alternate glyph, or a higher number where there are more: `mute1`, `sewi1`, `ni3`.
+- Put the words a long glyph covers in parentheses: `pi(toki pona)`, `(tenpo ni) la`.
+- In a cartouche, a comma after a glyph reads a syllable instead of the first letter: `[pona,,]` is Pona.
 - A sentence ending in `.`, `!` or `?` starts a new line in the image. A line break in the text does too.
 
 ## Files
