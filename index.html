@@ -486,7 +486,8 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
       <li>Write names with a capital letter, like <code>jan Mali</code>. Each sound gets a glyph inside a cartouche.</li>
       <li>Or build a cartouche yourself: <code>[mama ala lipu ilo]</code></li>
       <li>Join two glyphs with <code>&amp;</code>, stack them with <code>-</code>, or scale them with <code>+</code>: <code>toki&amp;pona</code></li>
-      <li>Add <code>1</code> after a word for its alternate glyph: <code>mute1</code>, <code>sewi1</code></li>
+      <li>Add <code>1</code> after a word for its alternate glyph: <code>mute1</code>, <code>sewi1</code>. The arrow of <code>ni</code> turns with <code>ni1</code> (left), <code>ni2</code> (up), <code>ni3</code> (right) and <code>ni5</code> to <code>ni8</code> (the diagonals).</li>
+      <li>In a cartouche, a comma after a glyph reads a syllable instead of the first letter: <code>[pona]</code> is P, <code>[pona,]</code> is Po, <code>[pona,,]</code> is Pona.</li>
       <li>Each sentence ending in <code>.</code>, <code>!</code> or <code>?</code> starts a new line in the image. Turn that off under Lines, or start a new line in the text yourself.</li>
       <li>Tap a glyph in the preview to see which word it is.</li>
     </ul>
@@ -565,7 +566,11 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
   "use strict";
 
   // All words the font draws as glyphs (nasin nanpa 4, pu + ku suli).
-  const WORDS = new Set(("a akesi ala alasa ale anpa ante anu awen e en esun ijo ike ilo insa jaki jan jelo jo kala kalama kama kasi ken kepeken kili kiwen ko kon kule kulupu kute la lape laso lawa len lete li lili linja lipu loje lon luka lukin lupa ma mama mani meli mi mije moku moli monsi mu mun musi mute nanpa nasa nasin nena ni nimi noka o olin ona open pakala pali palisa pan pana pi pilin pimeja pini pipi poka poki pona pu sama seli selo seme sewi sijelo sike sin sina sinpin sitelen sona soweli suli suno supa suwi tan taso tawa telo tenpo toki tomo tu unpa uta utala walo wan waso wawa weka wile namako kin oko kipisi leko monsuta tonsi jasima kijetesantakalu soko meso epiku kokosila lanpan n misikeke ku pake apeja majuna powe").split(" "));
+  const WORDS = new Set(("a akesi ala alasa ale anpa ante anu awen e en esun ijo ike ilo insa jaki jan jelo jo kala kalama kama kasi ken kepeken kili kiwen ko kon kule kulupu kute la lape laso lawa len lete li lili linja lipu loje lon luka lukin lupa ma mama mani meli mi mije moku moli monsi mu mun musi mute nanpa nasa nasin nena ni nimi noka o olin ona open pakala pali palisa pan pana pi pilin pimeja pini pipi poka poki pona pu sama seli selo seme sewi sijelo sike sin sina sinpin sitelen sona soweli suli suno supa suwi tan taso tawa telo tenpo toki tomo tu unpa uta utala walo wan waso wawa weka wile namako kin oko kipisi leko monsuta tonsi jasima kijetesantakalu soko meso epiku kokosila lanpan n misikeke ku pake apeja majuna powe linluwi su te to").split(" "));
+  // Which alternate suffixes the font has: ni1 to ni8 are arrow directions, a1 to a4 add stems, jaki and ko have
+  // eight hand-drawn variants, and seventeen words have a single second glyph. Anything else is not a word.
+  const ALT = { a: 4, ni: 8, jaki: 8, ko: 8 };
+  for (const w of "akesi kala meli mije mu mute olin pana sewi tenpo uta wile namako lanpan misikeke linluwi".split(" ")) ALT[w] = 1;
 
   // One glyph per sound for names in a cartouche. Letters outside toki pona use the closest sound.
   const SOUND = { a:"ala", e:"esun", i:"ilo", o:"olin", u:"uta", j:"jan", k:"kala", l:"lipu", m:"mama", n:"nena", p:"pona", s:"sona", t:"telo", w:"waso",
@@ -614,9 +619,12 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
   const LEAD = /^["'(]+/;
 
   function isKnown(core) {
-    // Joined forms like toki&pona, kala+lili, mute1
+    // Joined forms like toki&pona, kala+lili, mute1, ni3
     const parts = core.toLowerCase().split(/[&+\-]/);
-    return parts.length > 0 && parts.every((p) => p && WORDS.has(p.replace(/[12]$/, "")));
+    return parts.length > 0 && parts.every((p) => {
+      const m = /^([a-z]+)([1-8])?$/.exec(p);
+      return !!m && WORDS.has(m[1]) && (!m[2] || +m[2] <= (ALT[m[1]] || 0));
+    });
   }
 
   function nameToCartouche(name) {
@@ -639,7 +647,8 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
         continue;
       }
       tok = tok.replace(LEAD, "");
-      const punct = (tok.match(TRAIL) || [""])[0].replace(/[;"')\]]/g, (c) => (c === ";" ? ":" : ""));
+      // A comma is dropped here; inside a cartouche (handled above) it stays and draws the syllable tick.
+      const punct = (tok.match(TRAIL) || [""])[0].replace(/[;,"')\]]/g, (c) => (c === ";" ? ":" : ""));
       const core = tok.replace(TRAIL, "");
       if (!core) { if (punct) segs.push(at({ t: punct, glyph: true })); continue; }
 
@@ -1090,7 +1099,7 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
   // public-domain dictionary and her word data at tokipona.org (credit line in the sheet's foot and the README).
   const SHEET = [
     ["Particles", "fn", [["li", "before the verb"], ["e", "before the object"], ["la", "context, then"], ["pi", "of (groups words)"], ["o", "hey; please, do"], ["en", "and (joins subjects)"], ["anu", "or"], ["ala", "no, not"], ["seme", "what, which"], ["taso", "but; only"], ["a", "ah, oh; emphasis", [["a1", "two stems"], ["a2", "three stems"]]], ["kin", "also, too"], ["n", "hmm, um"], ["nanpa", "number; -th"]]],
-    ["Pronouns", "fn", [["mi", "I, me, we"], ["sina", "you"], ["ona", "he, she, it, they"], ["ni", "this, that", [["ni1", "arrow left"], ["ni2", "arrow up"]]]]],
+    ["Pronouns", "fn", [["mi", "I, me, we"], ["sina", "you"], ["ona", "he, she, it, they"], ["ni", "this, that", [["ni1", "arrow left"], ["ni2", "arrow up"], ["ni3", "arrow right"]]]]],
     ["Prepositions", "fn", [["lon", "at, in, on"], ["tawa", "to, towards"], ["tan", "from, because of"], ["kepeken", "using, with"], ["sama", "like, same as"]]],
     ["Before a verb", "fn", [["wile", "want to, need to", [["wile1", "pilin flipped"]]], ["ken", "can, may"], ["kama", "become, get to"], ["awen", "keep on, still"], ["open", "start to"], ["pini", "stop, finish"], ["sona", "know how to"], ["lukin", "try to"]]],
     ["Numbers", "fn", [["nanpa", "number; -th"], ["ala", "zero"], ["wan", "one"], ["tu", "two"], ["luka", "five"], ["mute", "many; 20", [["mute1", "four hands"]]], ["ale", "all; 100"]]],
@@ -1104,7 +1113,7 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
     ["Colours", "th", [["kule", "colour"], ["loje", "red"], ["jelo", "yellow"], ["laso", "blue, green"], ["walo", "white"], ["pimeja", "black, dark"]]],
     ["Qualities", "th", [["pona", "good"], ["ike", "bad"], ["suli", "big, important"], ["lili", "small, little"], ["mute", "many, much; very", [["mute1", "four hands"]]], ["ale", "all, every"], ["sama", "same, similar"], ["ante", "different, other"], ["sin", "new"], ["wawa", "strong"], ["lon", "real, true"], ["nasa", "strange, silly"], ["jaki", "dirty, gross"], ["suwi", "sweet, cute"], ["lete", "cold"], ["musi", "fun, play"], ["moli", "dead, death"], ["pakala", "broken, mistake"], ["monsuta", "scary, fear"]]],
     ["Actions", "th", [["toki", "speak, talk; language"], ["pali", "do, make, work"], ["pana", "give, send", [["pana1", "rays only"]]], ["jo", "have, hold"], ["wile", "want, need", [["wile1", "pilin flipped"]]], ["sona", "know; knowledge"], ["olin", "love", [["olin1", "with rays"]]], ["tawa", "go, move"], ["kama", "come, arrive"], ["awen", "stay, wait; keep"], ["open", "open, start"], ["pini", "end, finish"], ["kepeken", "use"], ["lape", "sleep, rest"], ["utala", "fight"], ["kipisi", "cut, split"], ["alasa", "hunt, search"], ["kalama", "sound, noise"], ["unpa", "sex"]]],
-    ["Rare", "th", [["pu", "the toki pona book"], ["ku", "the toki pona dictionary"], ["lanpan", "take, seize", [["lanpan1", "pana flipped"]]], ["majuna", "old, aged"], ["meso", "medium, average"], ["epiku", "epic, awesome"], ["jasima", "mirror, reflect"], ["oko", "eye"], ["kokosila", "not using toki pona"], ["powe", "fake, pretend"], ["apeja", "shame, guilt"], ["pake", "stop, block"]]],
+    ["Rare", "th", [["pu", "the toki pona book"], ["ku", "the toki pona dictionary"], ["lanpan", "take, seize", [["lanpan1", "pana flipped"]]], ["majuna", "old, aged"], ["meso", "medium, average"], ["epiku", "epic, awesome"], ["jasima", "mirror, reflect"], ["oko", "eye"], ["kokosila", "not using toki pona"], ["powe", "fake, pretend"], ["apeja", "shame, guilt"], ["pake", "stop, block"], ["linluwi", "network, internet"], ["su", "the su story books"], ["te", "opens a quote"], ["to", "closes a quote"]]],
   ];
   // The app's notation: the mark, its meaning, a sample the font draws, and how a tap lands (null: read-only).
   const MARKS = [
@@ -1112,6 +1121,7 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
     ["-", "stacks two glyphs", "toki-pona", "glue"],
     ["+", "scales the 2nd glyph", "toki+pona", "glue"],
     ["[ ]", "cartouche (a name)", "[ilo]", "cartouche"],
+    [",", "in a name: one syllable per tick", "[pona,,]", "glue"],
     ["Mali", "capital = name", nameToCartouche("Mali"), null],
     [". ! ?", "start a new line", "toki. pona!", null],
   ];
@@ -1123,7 +1133,8 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
   // Where a tap lands. Pure: the text, the remembered selection and what the tile stands for, to the new text and caret.
   // A word gets a space before it unless the text before the caret is empty or ends in whitespace, a glue mark or "[",
   // and a space after unless the next character is whitespace, punctuation or "]". A glue mark snaps to the word before
-  // the caret (or before the end of the selection) with no space after; with no word there it leaves the text alone.
+  // the caret (or before the end of the selection) with no space after; with no word there it leaves the text alone,
+  // except that a syllable tick "," may follow another tick.
   // "[ ]" wraps a selection, its outer whitespace kept outside the brackets, else inserts "[]" with the caret inside;
   // inside brackets it steps out past the "]" and onto a space, closing the cartouche first if the "]" is missing.
   // Checked by scripts/test-place.mjs, which extracts this block.
@@ -1134,7 +1145,7 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
     const before = v.slice(0, s), after = v.slice(e);
     if (kind === "glue") {
       const b = v.slice(0, e).replace(/\s+$/, "");
-      if (!/[A-Za-z0-9]$/.test(b)) return { value: v, caret: e };
+      if (!/[A-Za-z0-9]$/.test(b) && !(ins === "," && b.endsWith(","))) return { value: v, caret: e };
       return { value: b + ins + after, caret: b.length + ins.length };
     }
     if (kind === "cartouche") {
@@ -1321,6 +1332,7 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
     add(w, m);
     for (const [a, note] of alts || []) add(a, m + " (" + note + ")");
   }
+  for (const [i, dir] of [[4, "down"], [5, "up left"], [6, "up right"], [7, "down right"], [8, "down left"]]) MEANING.set("ni" + i, ["this, that (arrow " + dir + ")"]);
   const bare = (t) => t.replace(TRAIL, "");
   function gloss(seg) {
     if (!seg.glyph) return "not toki pona, drawn as letters";

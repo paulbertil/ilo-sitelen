@@ -45,6 +45,10 @@ t("glue before another word keeps that word", place("toki mi", 4, 4, "&", "glue"
 t("glue with a selection snaps to its end, keeping the word", place("toki pona mi", 5, 9, "&", "glue"), "toki pona& mi", 10);
 t("glue in an empty box leaves it alone", place("", 0, 0, "-", "glue"), "", 0);
 t("glue at the start of the text leaves it alone", place("toki", 0, 0, "&", "glue"), "toki", 0);
+t("syllable tick snaps to the glyph in a cartouche", place("[pona", 5, 5, ",", "glue"), "[pona,", 6);
+t("a second tick follows the first", place("[pona,", 6, 6, ",", "glue"), "[pona,,", 7);
+t("a tick before the ] keeps the ]", place("[pona]", 5, 5, ",", "glue"), "[pona,]", 6);
+t("other glue marks still refuse to follow a tick", place("[pona,", 6, 6, "&", "glue"), "[pona,", 6);
 t("glue after a full stop leaves it alone", place("toki.", 5, 5, "&", "glue"), "toki.", 5);
 t("glue after a glue mark leaves it alone", place("toki&", 5, 5, "-", "glue"), "toki&", 5);
 t("glue after [ leaves it alone", place("[", 1, 1, "&", "glue"), "[", 1);
