@@ -9,7 +9,7 @@ A small installable web app (PWA). No build step, no backend: everything happens
 - Live preview that redraws as you type.
 - **Copy image** puts a PNG on the clipboard. **Share** and **Save** are also available on the installed app.
 - Capitalized words are treated as names and written in a cartouche, one glyph per sound. `jan Mali` becomes `[mama ala lipu ilo]`.
-- Words the font cannot draw (outside pu, ku suli and the four ku lili linluwi, su, te and to) get a dashed red underline in the box (the word still being typed is spared), are listed under it, and are drawn as plain letters.
+- Words the font cannot draw (outside pu, ku suli and the ku lili kiki, linluwi, su, te, to and wa) get a dashed red underline in the box (the word still being typed is spared), are listed under it, and are drawn as plain letters.
 - Tap a glyph in the preview to see which word it is: the glyph and its word get the same ochre ring, and a bubble over the word shows the glyph, the word and its meaning. Tap the glyph again, tap anywhere else, or edit the text to clear it.
 - Punctuation follows sitelen pona conventions: `.` becomes the middle dot, `:` the colon glyph, `?` and `!` are kept, commas are dropped. Inside a cartouche a comma stays: it is the syllable tick of nasin sitelen kalama pi linja lili, so `[pona,,]` reads Pona.
 - Long glyphs: `pi(toki pona)` stretches pi under the phrase, `(tenpo ni) la` stretches la back under it. The font has long forms for a, alasa, anu, awen, kama, ken, kepeken, la, lon, nanpa, open, pi, pini, sona, tawa, wile and n; a run with a word the font cannot draw, or with a name in it, falls apart into its words.
