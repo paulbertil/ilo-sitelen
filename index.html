@@ -160,8 +160,20 @@ textarea, .mirror {
   font: 600 1.05rem/1.45 var(--font);
   border: var(--bw) solid var(--line); border-radius: var(--radius); padding: 20px 18px 14px;
 }
-textarea { min-height: 104px; resize: vertical; color: var(--fg); background: transparent; }
+textarea { display: block; min-height: 104px; resize: none; color: var(--fg); background: transparent; }
 textarea::placeholder { color: var(--muted); opacity: 0.7; }
+/* The box can be pulled taller by the grip in its corner: the browser's own grip redrawn in the box's line weight, since
+   the native one is faint on this border and does not exist on iOS. The hit area is the whole corner. */
+.box { position: relative; }
+.grip {
+  position: absolute; right: 0; bottom: 0; z-index: 2;
+  display: grid; place-items: end; width: 48px; height: 48px; padding: 0 9px 9px 0;
+  border-radius: 0 0 var(--radius) 0;
+  color: var(--fg); cursor: ns-resize; touch-action: none;
+  user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent;
+}
+.grip:focus-visible { outline: var(--bw) solid var(--accent); outline-offset: 3px; }
+.grip svg { display: block; width: 24px; height: 24px; }
 
 .unknown {
   border: var(--bw) dashed var(--line); border-radius: 14px;
@@ -193,8 +205,8 @@ textarea::placeholder { color: var(--muted); opacity: 0.7; }
 .ring { position: absolute; box-sizing: border-box; border: 3px solid var(--accent); background: rgba(232, 197, 131, 0.28); border-radius: 12px; opacity: 0; transition: left .14s, top .14s, width .14s, height .14s, opacity .15s; }
 .ring.show { opacity: 1; }
 /* The mirror sits behind the box with transparent letters, so the tapped word's ring lands exactly under the real ones.
-   The field is its own stacking context, so the mirror can go under the box and still over the page. */
-.field { isolation: isolate; }
+   The box wrap is its own stacking context, so the mirror can go under the box and still over the page. */
+.box { isolation: isolate; }
 .mirror { position: absolute; top: 0; left: 0; z-index: -1; overflow: hidden; pointer-events: none; color: transparent; border-color: transparent; white-space: pre-wrap; overflow-wrap: break-word; }
 .mirror .hit { background: rgba(232, 197, 131, 0.28); border-radius: 7px; box-shadow: 0 0 0 3px rgba(232, 197, 131, 0.28), 0 0 0 5px var(--accent); }
 /* A word outside toki pona gets a dashed red underline, except the one still being typed at the caret. */
@@ -461,8 +473,11 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
       <label class="lbl" for="text">Your message</label>
       <button type="button" class="icon-btn book-btn" id="book-btn" aria-label="Open the cheat sheet" title="Cheat sheet" aria-expanded="false" aria-controls="sheet"><span class="theme-glyph" aria-hidden="true">sona</span></button>
     </div>
-    <div class="mirror" id="mirror" aria-hidden="true"></div>
-    <textarea id="text" autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="toki! mi jan Mali."></textarea>
+    <div class="box">
+      <div class="mirror" id="mirror" aria-hidden="true"></div>
+      <textarea id="text" autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="toki! mi jan Mali."></textarea>
+      <div class="grip" id="grip" role="separator" aria-orientation="horizontal" aria-label="Box height: drag, or use the arrow keys" tabindex="0" aria-valuemin="104"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 9 9 21M21 16l-5 5"/></svg></div>
+    </div>
     <div class="wpop" id="wpop" aria-hidden="true"></div>
     <div class="unknown" id="unknown" hidden></div>
   </section>
@@ -1383,6 +1398,19 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
   // The mirror follows the box's size (its corner can be dragged) and scroll.
   new ResizeObserver(() => { mirrorEl.style.width = textEl.offsetWidth + "px"; mirrorEl.style.height = textEl.offsetHeight + "px"; }).observe(textEl);
   textEl.addEventListener("scroll", () => { mirrorEl.scrollTop = textEl.scrollTop; if (tapped) showTap(); });
+  // The grip in the box's corner: a drag sets the box's height, between its minimum and most of the screen; the arrow
+  // keys do the same when the grip has focus. Pointer capture keeps a touch drag going past the grip itself.
+  {
+    const grip = $("grip"), MIN = 104, maxH = () => Math.max(MIN, Math.round(innerHeight * 0.7));
+    const sync = () => { grip.setAttribute("aria-valuenow", textEl.offsetHeight); grip.setAttribute("aria-valuemax", maxH()); };
+    const setH = (h) => { textEl.style.height = Math.max(MIN, Math.min(maxH(), Math.round(h))) + "px"; sync(); };
+    sync();
+    let from = null; // where the drag started: the pointer's y and the box's height
+    grip.addEventListener("pointerdown", (e) => { from = { y: e.clientY, h: textEl.offsetHeight }; grip.setPointerCapture(e.pointerId); e.preventDefault(); });
+    grip.addEventListener("pointermove", (e) => { if (from) setH(from.h + e.clientY - from.y); });
+    for (const ev of ["pointerup", "pointercancel"]) grip.addEventListener(ev, () => { from = null; });
+    grip.addEventListener("keydown", (e) => { const d = { ArrowUp: -24, ArrowDown: 24 }[e.key]; if (d) { e.preventDefault(); setH(textEl.offsetHeight + d); } });
+  }
 
   let segs = [], words = [], mirrorText = "", tapped = null; // tapped: the segment's index, and the text it was tapped in
   // After each paint: the segments the preview now shows, the mirror rebuilt around them, and the ring kept or dropped.
