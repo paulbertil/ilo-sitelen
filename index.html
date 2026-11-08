@@ -41,7 +41,7 @@
 // A saved light or dark choice is applied before the first paint. Without one the CSS below follows the device.
 try { const t = localStorage.getItem("ilo-sitelen:theme"); if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; } catch {}
 // Prototype (card-fold): ?variant=a..e picks how a long note is folded in Recents. Set here so the first paint has it.
-try { const v = new URLSearchParams(location.search).get("variant"); if (/^[a-e]$/.test(v)) document.documentElement.dataset.variant = v; } catch {}
+try { const v = new URLSearchParams(location.search).get("variant"); if (/^[a-g]$/.test(v)) document.documentElement.dataset.variant = v; } catch {}
 </script>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
@@ -362,19 +362,20 @@ body.shelf-open .shelf { transform: none; visibility: visible; transition: trans
 /* ---- Prototype (card-fold): a long note is folded at --card-max in the shelf. ?variant=a..e picks the treatment. ----
    The image sits in a clip; a card is .tall when the image would run past the fold, .open once it is unfolded.
    While folded, the 2px frame moves from the image to the clip so the cut edge stays a straight framed line. */
-:root { --card-max: 160px; }
-.card-fig { position: relative; min-width: 0; display: grid; gap: 6px; }
-.card-clip { min-width: 0; }
+:root { --card-max: 128px; }
+.card-fig { min-width: 0; display: grid; gap: 6px; }
+.card-win { position: relative; min-width: 0; width: fit-content; max-width: 100%; }
+.card-clip { min-width: 0; width: fit-content; max-width: 100%; }
 .card-more { display: none; align-items: center; gap: 5px; font: 700 0.78rem/1 var(--font); white-space: nowrap; }
 .card-more svg { width: 14px; height: 14px; flex: none; }
 .card-more .up { display: none; }
 .card.open .card-more .up { display: block; }
 .card.open .card-more .down { display: none; }
 .card.tall .card-more { display: inline-flex; }
-.card.tall:not(.open) .card-clip { max-height: var(--card-max); overflow: hidden; border: 2px solid var(--line); border-radius: 8px; }
+.card.tall:not(.open) .card-clip { max-height: var(--fold, var(--card-max)); overflow: hidden; border: 2px solid var(--line); border-radius: 8px; }
 .card.tall:not(.open) .card-clip .card-img img { border: 0; border-radius: 0; }
 /* a: the glyphs fade into the note's own paper, and a pill on the fade says More. Unfolded, the pill straddles the bottom edge. */
-[data-variant="a"] .card.tall:not(.open) .card-fig::after { content: ""; position: absolute; left: 2px; right: 2px; bottom: 2px; height: 76px; border-radius: 0 0 6px 6px; background: linear-gradient(to bottom, transparent, var(--thumb-bg) 80%); pointer-events: none; }
+:is([data-variant="a"], [data-variant="f"], [data-variant="g"]) .card.tall:not(.open) .card-win::after { content: ""; position: absolute; left: 2px; right: 2px; bottom: 2px; height: min(72px, 55%); border-radius: 0 0 6px 6px; background: linear-gradient(to bottom, transparent, var(--thumb-bg) 80%); pointer-events: none; }
 [data-variant="a"] .card-more { position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); z-index: 1; padding: 6px 12px 6px 9px; border-radius: 999px; background: var(--thumb-bg); color: var(--thumb-ink); border: 2px solid var(--thumb-ink); }
 [data-variant="a"] .card.open .card-fig { margin-bottom: 14px; }
 [data-variant="a"] .card.open .card-more { bottom: -14px; background: var(--bg); color: var(--fg); border-color: var(--line); }
@@ -388,19 +389,25 @@ body.shelf-open .shelf { transform: none; visibility: visible; transition: trans
 [data-variant="c"] .card-more { position: absolute; right: 8px; bottom: 12px; z-index: 1; padding: 4px 9px; border-radius: 999px; background: var(--bg); color: var(--fg); border: 2px solid var(--line); }
 [data-variant="c"] .card.open .card-fig { margin-bottom: 14px; }
 [data-variant="c"] .card.open .card-more { bottom: -14px; }
+/* f: a's fade with c's chip, no tear: the glyphs dissolve into the note's paper and a +N lines chip sits in the corner.
+   g: the same, with the chip in the note's own ink, like a's pill. */
+:is([data-variant="f"], [data-variant="g"]) .card-more { position: absolute; right: 8px; bottom: 8px; z-index: 1; padding: 4px 9px; border-radius: 999px; background: var(--bg); color: var(--fg); border: 2px solid var(--line); }
+[data-variant="g"] .card.tall:not(.open) .card-more { background: var(--thumb-bg); color: var(--thumb-ink); border-color: var(--thumb-ink); }
+:is([data-variant="f"], [data-variant="g"]) .card.open .card-fig { margin-bottom: 14px; }
+:is([data-variant="f"], [data-variant="g"]) .card.open .card-more { bottom: -14px; }
 /* d: nothing is cut; the whole note is shrunk to the fold height, with Full size beside it. */
-[data-variant="d"] .card.tall:not(.open) .card-fig { display: flex; align-items: flex-end; gap: 10px; }
+[data-variant="d"] .card.tall:not(.open) .card-win { display: flex; align-items: flex-end; gap: 10px; }
 [data-variant="d"] .card.tall:not(.open) .card-clip { flex: none; max-width: 100%; max-height: none; overflow: visible; border: 0; border-radius: 0; }
 [data-variant="d"] .card.tall:not(.open) .card-img { width: auto; }
-[data-variant="d"] .card.tall:not(.open) .card-clip .card-img img { border: 2px solid var(--line); border-radius: 8px; max-height: var(--card-max); width: auto; }
+[data-variant="d"] .card.tall:not(.open) .card-clip .card-img img { border: 2px solid var(--line); border-radius: 8px; max-height: var(--fold, var(--card-max)); width: auto; }
 [data-variant="d"] .card-more { padding: 6px 11px 6px 9px; border-radius: 999px; background: var(--bg); color: var(--fg); border: 2px solid var(--line); }
 [data-variant="d"] .card.open .card-fig { margin-bottom: 14px; }
 [data-variant="d"] .card.open .card-more { position: absolute; right: 8px; bottom: -14px; z-index: 1; }
 /* e: the note scrolls inside its frame; a fade at the bottom says there is more, and goes once the end is reached. */
-[data-variant="e"] .card.tall .card-clip { max-height: var(--card-max); overflow-y: auto; overscroll-behavior: contain; border: 2px solid var(--line); border-radius: 8px; scrollbar-width: thin; scrollbar-color: var(--muted) transparent; }
+[data-variant="e"] .card.tall .card-clip { max-height: var(--fold, var(--card-max)); overflow-y: auto; overscroll-behavior: contain; border: 2px solid var(--line); border-radius: 8px; scrollbar-width: thin; scrollbar-color: var(--muted) transparent; }
 [data-variant="e"] .card.tall .card-clip .card-img img { border: 0; border-radius: 0; }
-[data-variant="e"] .card.tall .card-fig::after { content: ""; position: absolute; left: 2px; right: 2px; bottom: 2px; height: 44px; border-radius: 0 0 6px 6px; background: linear-gradient(to bottom, transparent, var(--thumb-bg) 85%); pointer-events: none; transition: opacity .15s; }
-[data-variant="e"] .card.tall .card-fig.at-end::after { opacity: 0; }
+[data-variant="e"] .card.tall .card-win::after { content: ""; position: absolute; left: 2px; right: 2px; bottom: 2px; height: 44px; border-radius: 0 0 6px 6px; background: linear-gradient(to bottom, transparent, var(--thumb-bg) 85%); pointer-events: none; transition: opacity .15s; }
+[data-variant="e"] .card.tall .card-fig.at-end .card-win::after { opacity: 0; }
 [data-variant="e"] .card-more { display: none !important; }
 .s-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 12px; border-top: var(--bw) solid var(--line); padding: 6px 16px; font-size: 0.78rem; color: var(--muted); }
 .s-foot p { margin: 0; flex: 1 1 auto; }
@@ -1144,8 +1151,10 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
       if (VARIANT) { // prototype (card-fold): the image in a clip, with a More control beside it
         const clip = el("div", { class: "card-clip" }, open);
         const more = el("button", { class: "card-more", type: "button", "aria-expanded": "false" });
-        fig = el("div", { class: "card-fig" }, clip, more);
-        fig.th = th;
+        const win = el("div", { class: "card-win" }, clip); // hugs the image, so the fade and the chip stop where it does
+        fig = VARIANT === "b" ? el("div", { class: "card-fig" }, win, more) : el("div", { class: "card-fig" }, win);
+        if (VARIANT !== "b") win.append(more);
+        fig.th = th; fig.more = more; fig.clip = clip;
         more.addEventListener("click", () => {
           if (unfolded.has(r.text)) unfolded.delete(r.text); else unfolded.add(r.text);
           foldCards();
@@ -1172,23 +1181,28 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
   const EXPAND = CHEV("down", "M4 10V4h6M20 14v6h-6M4 4l6 6M20 20l-6-6"), SHRINK = CHEV("up", "M10 4v6H4M14 20v-6h6M10 10 4 4M14 14l6 6");
   function foldCards() {
     if (!VARIANT) return;
-    const max = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--card-max")) || 160;
+    const max = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--card-max")) || 128;
     let w = 0;
     for (const [card, r] of cards) {
-      const fig = card.firstElementChild, th = fig.th, more = fig.lastElementChild;
-      if (!w) w = fig.firstElementChild.clientWidth - 4;
+      const fig = card.firstElementChild, th = fig.th, more = fig.more;
+      if (!w) w = fig.clientWidth - 4;
       const shown = Math.min(w, th.w), scale = shown / th.w, h = th.h * scale;
-      const tall = h > max + 12, open = unfolded.has(r.text);
+      // A short note drawn at full size has tall rows: the fold always shows two of them, so the card's own fold
+      // can sit lower than --card-max. A note that ends within a row of the fold is not folded at all.
+      const lineH = th.lineH * scale, pad = th.pad * scale;
+      const fold = Math.max(max, pad + 2 * lineH), fit = Math.floor((fold - pad) / lineH);
+      const tall = h > fold + lineH / 2 && th.rows > fit, open = unfolded.has(r.text);
       card.classList.toggle("tall", tall);
       card.classList.toggle("open", open);
+      card.style.setProperty("--fold", fold > max ? Math.round(fold) + "px" : "");
       if (!tall) continue;
-      const below = Math.max(1, th.rows - Math.floor((max / scale - th.pad) / th.lineH));
+      const below = Math.max(1, th.rows - fit);
       const lines = below + (below === 1 ? " more line" : " more lines");
       more.setAttribute("aria-expanded", String(open));
       more.setAttribute("aria-label", open ? "Show less of this note" : "Show the whole note, " + lines);
       if (VARIANT === "a") more.innerHTML = CHEV_DOWN + CHEV_UP + "<span>" + (open ? "Less" : "More") + "</span>";
       else if (VARIANT === "b") more.innerHTML = CHEV_DOWN + CHEV_UP + "<span>" + (open ? "Show less" : "Show all") + "</span>" + (open ? "" : '<span class="n">' + lines + "</span>");
-      else if (VARIANT === "c") more.innerHTML = (open ? "" : "<span>+" + below + (below === 1 ? " line" : " lines") + "</span>") + CHEV_DOWN + CHEV_UP;
+      else if (VARIANT === "c" || VARIANT === "f" || VARIANT === "g") more.innerHTML = (open ? "" : "<span>+" + below + (below === 1 ? " line" : " lines") + "</span>") + CHEV_DOWN + CHEV_UP;
       else if (VARIANT === "d") more.innerHTML = EXPAND + SHRINK + "<span>" + (open ? "Fit" : "Full size") + "</span>";
     }
   }

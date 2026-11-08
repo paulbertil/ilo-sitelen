@@ -29,7 +29,7 @@
 <div class="bar">
   <h1>Long notes in Recents</h1>
   <button type="button" id="dark" aria-pressed="false">Dark</button>
-  <label>Fold at <input type="range" id="max" min="100" max="320" step="4" value="160"> <output id="maxv">160px</output></label>
+  <label>Fold at <input type="range" id="max" min="100" max="320" step="4" value="128"> <output id="maxv">128px</output></label>
   <label><input type="checkbox" id="sync" checked> Scroll together</label>
   <button type="button" id="seed">Reset the sample notes</button>
 </div>
@@ -41,6 +41,8 @@ const VARIANTS = {
   c: "Torn: a zigzag tear, with a +N lines chip in the corner.",
   d: "Shrunk: nothing is cut, the whole note fits the fold height, Full size beside it.",
   e: "Scroll: the note scrolls inside its own frame; the fade goes at the end.",
+  f: "Fade and chip: a's fade into the note's paper, with c's +N lines chip in the corner, no tear.",
+  g: "Fade and chip, inked: as f, but the chip takes the note's own ink while folded.",
 };
 const now = Date.now(), m = 6e4, h = 36e5;
 const SAMPLE = [
@@ -63,12 +65,13 @@ sina pona ala pona? mi wile toki tawa sina.
 tenpo suno kama la mi tawa tomo sina. o awen!`, size: "s", style: "paper", names: true, sentences: true, at: now - 11 * h },
   { text: `o kute e ni. mi pali e ilo sin. ilo ni li sitelen e toki pona. sina ken kepeken ona lon ilo sina. mi wile e ni: sina lukin e ona. sina pilin seme? o toki tawa mi. mi wile pona e ona. tenpo kama la ona li ken pali e ijo mute. mi pilin pona tan ni.`, size: "s", style: "night", names: true, sentences: false, at: now - 30 * h },
   { text: "toki a! sina seme?", size: "s", style: "night", names: true, sentences: true, at: now - 31 * h },
+  { text: "kili\nkasi\nmoku\ntelo\nsuno\nmun\nseli\nko", size: "s", style: "night", names: true, sentences: true, at: now - 50 * h },
 ];
 const KEY = "ilo-sitelen:recents";
 function seed() { localStorage.setItem(KEY, JSON.stringify(SAMPLE)); localStorage.removeItem("ilo-sitelen:text"); }
 if (!localStorage.getItem(KEY)) seed();
 
-const order = ["a", "b", "c", "d"];
+const order = ["f", "b", "g", "a"];
 const row = document.getElementById("row");
 const frames = [];
 let theme = "light";
