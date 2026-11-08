@@ -363,7 +363,8 @@ body.shelf-open .shelf { transform: none; visibility: visible; transition: trans
 .s-act { gap: 5px; padding: 8px 0; border: 0; border-radius: 3px; background: transparent; font-size: 0.8rem; color: var(--fg); text-decoration: underline; text-underline-offset: 3px; }
 .s-act:active { transform: none; }
 .s-act svg { width: 14px; height: 14px; flex: none; color: var(--muted); }
-.s-paste { flex-basis: 100%; margin: 2px 0 6px; font: 500 0.95rem/1.3 var(--font); color: var(--fg); background: transparent; border: var(--bw) solid var(--line); border-radius: 999px; padding: 8px 14px; -webkit-appearance: none; appearance: none; }
+/* 1rem, not smaller: below 16px, iOS Safari zooms the page in when the field is focused, and the app then overflows sideways. */
+.s-paste { flex-basis: 100%; margin: 2px 0 6px; font: 500 1rem/1.3 var(--font); color: var(--fg); background: transparent; border: var(--bw) solid var(--line); border-radius: 999px; padding: 8px 14px; -webkit-appearance: none; appearance: none; }
 .s-acts { display: flex; flex-wrap: wrap; gap: 6px; }
 /* Recents arriving from another device: a card above the list asking what to do with them. */
 .s-import { display: grid; gap: 8px; border: var(--bw) solid var(--accent); border-radius: 14px; padding: 12px 14px; margin-top: 8px; font-size: 0.84rem; color: var(--muted); }
