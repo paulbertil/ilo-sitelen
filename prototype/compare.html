@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Folded cards: compare</title>
+<style>
+  :root { --s: 1; }
+  html, body { margin: 0; background: #d9d2c0; color: #121110; font: 600 14px/1.4 "Quicksand", "Avenir Next Rounded", ui-rounded, system-ui, sans-serif; }
+  .bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; padding: 10px 16px; background: #f5ecd7; border-bottom: 3px solid #121110; position: sticky; top: 0; z-index: 2; }
+  .bar h1 { font-size: 15px; margin: 0 8px 0 0; }
+  .bar label { display: inline-flex; align-items: center; gap: 8px; }
+  .bar input[type=range] { width: 180px; }
+  .bar output { min-width: 4ch; font-variant-numeric: tabular-nums; }
+  button { font: inherit; padding: 6px 12px; border: 2px solid #121110; border-radius: 999px; background: #fff; cursor: pointer; }
+  button[aria-pressed="true"] { background: #e8c583; }
+  .row { display: flex; gap: 14px; padding: 14px 16px 30px; align-items: flex-start; }
+  .slot { width: calc(390px * var(--s)); flex: none; }
+  .slot header { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; }
+  .slot header b { font-size: 22px; width: 30px; height: 30px; display: grid; place-items: center; border: 2px solid #121110; border-radius: 10px; background: #fff; }
+  .slot header select { font: inherit; font-weight: 700; padding: 4px 6px; border: 2px solid #121110; border-radius: 8px; background: #fff; max-width: calc(100% - 40px); }
+  .slot p { margin: 0 0 8px; font-weight: 500; font-size: 13px; min-height: 2.8em; }
+  figure { margin: 0; width: 390px; height: 844px; transform: scale(var(--s)); transform-origin: top left; border: 10px solid #121110; border-radius: 44px; overflow: hidden; background: #000; box-shadow: 0 12px 30px rgb(0 0 0 / .25); }
+  .slot .fit { height: calc(844px * var(--s) + 20px); }
+  iframe { width: 390px; height: 844px; border: 0; display: block; background: #f5ecd7; }
+</style>
+</head>
+<body>
+<div class="bar">
+  <h1>Long notes in Recents</h1>
+  <button type="button" id="dark" aria-pressed="false">Dark</button>
+  <label>Fold at <input type="range" id="max" min="100" max="320" step="4" value="160"> <output id="maxv">160px</output></label>
+  <label><input type="checkbox" id="sync" checked> Scroll together</label>
+  <button type="button" id="seed">Reset the sample notes</button>
+</div>
+<div class="row" id="row"></div>
+<script>
+const VARIANTS = {
+  a: "Fade: the glyphs dissolve into the note's own paper, with a More pill on the fade.",
+  b: "Cut: a straight edge, then a Show all row that counts the lines below.",
+  c: "Torn: a zigzag tear, with a +N lines chip in the corner.",
+  d: "Shrunk: nothing is cut, the whole note fits the fold height, Full size beside it.",
+  e: "Scroll: the note scrolls inside its own frame; the fade goes at the end.",
+};
+const now = Date.now(), m = 6e4, h = 36e5;
+const SAMPLE = [
+  { text: "mi olin e sina.", size: "s", style: "night", names: true, sentences: true, at: now - 9 * m },
+  { text: `tenpo pini la jan lili li lon ma kasi. ona li wile tawa mun.
+ona li toki e ni tawa mama ona: "mi wile tawa mun. mun li pona tawa mi."
+mama li toki: "mun li weka mute. sina ken ala tawa ona."
+
+jan lili li pilin ike. taso ona li awen wile.
+tenpo pimeja ale la ona li lukin e mun. ona li toki tawa mun.
+mun li toki ala. taso mun li suno tawa ona.
+
+tenpo suno wan la jan lili li kama sona e ni: mun li lon insa pi telo suli.
+ona li tawa telo. ona li lukin e mun lon telo. ona li pilin pona.
+"mun li lon ni. mi tawa mun." ona li toki.
+
+tenpo ni la jan lili li lon poka pi telo suli. ona li lukin e mun. ona li pona.`, size: "s", style: "night", names: true, sentences: true, at: now - 9 * h },
+  { text: `toki! mi jan Pewi. mi kama sona e toki pona.
+sina pona ala pona? mi wile toki tawa sina.
+tenpo suno kama la mi tawa tomo sina. o awen!`, size: "s", style: "paper", names: true, sentences: true, at: now - 11 * h },
+  { text: `o kute e ni. mi pali e ilo sin. ilo ni li sitelen e toki pona. sina ken kepeken ona lon ilo sina. mi wile e ni: sina lukin e ona. sina pilin seme? o toki tawa mi. mi wile pona e ona. tenpo kama la ona li ken pali e ijo mute. mi pilin pona tan ni.`, size: "s", style: "night", names: true, sentences: false, at: now - 30 * h },
+  { text: "toki a! sina seme?", size: "s", style: "night", names: true, sentences: true, at: now - 31 * h },
+];
+const KEY = "ilo-sitelen:recents";
+function seed() { localStorage.setItem(KEY, JSON.stringify(SAMPLE)); localStorage.removeItem("ilo-sitelen:text"); }
+if (!localStorage.getItem(KEY)) seed();
+
+const order = ["a", "b", "c", "d"];
+const row = document.getElementById("row");
+const frames = [];
+let theme = "light";
+const maxEl = document.getElementById("max"), maxV = document.getElementById("maxv");
+const post = (f, msg) => { try { f.contentWindow.postMessage(msg, "*"); } catch {} };
+const settle = (f) => { post(f, { theme }); post(f, { cardMax: +maxEl.value }); };
+
+order.forEach((v, i) => {
+  const slot = document.createElement("div"); slot.className = "slot";
+  const head = document.createElement("header");
+  const letter = document.createElement("b"); letter.textContent = v;
+  const sel = document.createElement("select");
+  for (const k of Object.keys(VARIANTS)) { const o = document.createElement("option"); o.value = k; o.textContent = k + ": " + VARIANTS[k].split(":")[0]; o.selected = k === v; sel.append(o); }
+  head.append(letter, sel);
+  const desc = document.createElement("p"); desc.textContent = VARIANTS[v];
+  const fit = document.createElement("div"); fit.className = "fit";
+  const fig = document.createElement("figure");
+  const f = document.createElement("iframe"); f.title = "Variant " + v;
+  const load = (k) => { f.src = "../index.html?variant=" + k + "&shelf=1&slot=" + i; letter.textContent = k; desc.textContent = VARIANTS[k]; };
+  sel.addEventListener("change", () => load(sel.value));
+  f.addEventListener("load", () => { settle(f); hookScroll(f); });
+  fig.append(f); fit.append(fig); slot.append(head, desc, fit); row.append(slot);
+  frames.push(f);
+  load(v);
+});
+
+document.getElementById("dark").addEventListener("click", (e) => {
+  theme = theme === "dark" ? "light" : "dark";
+  e.currentTarget.setAttribute("aria-pressed", String(theme === "dark"));
+  frames.forEach((f) => post(f, { theme }));
+});
+maxEl.addEventListener("input", () => { maxV.textContent = maxEl.value + "px"; frames.forEach((f) => post(f, { cardMax: +maxEl.value })); });
+document.getElementById("seed").addEventListener("click", () => { seed(); frames.forEach((f) => { f.contentWindow.location.reload(); }); });
+
+// The shelf list in one frame scrolls the others, same origin so the list is reachable directly.
+let syncing = false;
+function hookScroll(f) {
+  const list = f.contentDocument && f.contentDocument.getElementById("s-list");
+  if (!list) return;
+  list.addEventListener("scroll", () => {
+    if (syncing || !document.getElementById("sync").checked) return;
+    syncing = true;
+    for (const o of frames) if (o !== f) { const l = o.contentDocument && o.contentDocument.getElementById("s-list"); if (l) l.scrollTop = list.scrollTop; }
+    requestAnimationFrame(() => { syncing = false; });
+  }, { passive: true });
+}
+
+function scale() { document.documentElement.style.setProperty("--s", Math.min(1, (innerWidth - 32 - 14 * 3) / (390 * 4))); }
+addEventListener("resize", scale); scale();
+</script>
+</body>
+</html>
