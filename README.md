@@ -37,9 +37,9 @@ A small installable web app (PWA). No build step, no backend: everything happens
 | File | Purpose |
 | --- | --- |
 | `index.html` | The whole app: markup, styles, logic, and the embedded font |
-| `fonts/` | The two fonts that load on demand, as woff2, with their licenses. `linja-pona.woff2` is linja pona 4.9 converted as is; `sitelen-seli-kiwen.woff2` is the juniko build of sitelen seli kiwen 2.3, cut down to ASCII, the joiners and the sitelen pona code points |
+| `fonts/` | The two fonts that load on demand, as woff2, with their licenses. `linja-pona-4.9.woff2` is linja pona 4.9 converted as is; `sitelen-seli-kiwen-2.3.woff2` is the juniko build of sitelen seli kiwen 2.3, cut down to ASCII, the joiners and the sitelen pona code points. The version is in the file name, so a new font is a new file and no cache serves the old one |
 | `manifest.webmanifest` | PWA manifest (name, icons, standalone display) |
-| `sw.js` | Service worker that serves the app shell from cache and hands over to a new version when the user taps Update. Bump `CACHE` with every deploy. Font files go in their own cache, `FONTS`, kept across versions: bump it when a font file changes |
+| `sw.js` | Service worker that serves the app shell from cache and hands over to a new version when the user taps Update. Bump `CACHE` with every deploy. Font files go in their own cache, `FONTS`, kept across versions; a new font comes under a new file name, so bump `FONTS` only to clear old files out |
 | `icons/` | App icons, rendered from the font's `ilo` glyph |
 | `scripts/` | `og.html` draws the link card image; `test-place.mjs` checks where a cheat sheet tap lands |
 

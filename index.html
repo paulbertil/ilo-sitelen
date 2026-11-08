@@ -283,6 +283,9 @@ label.setting { cursor: pointer; }
 .fontpick button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
 .fontpick img { display: block; width: 100%; height: 44px; object-fit: contain; }
 .fontpick span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fontpick small { display: none; font-size: 0.72rem; opacity: 0.75; }
+.fontpick button[data-failed] small { display: block; }
+.fontpick button[data-failed] img { opacity: 0.4; }
 /* A palette as a small round chip before its name. The Theme chip is half Dark, half White, since the image takes whichever
    the app shows: its gradient is set from the two palettes in the script. */
 .swatch-chip { flex: none; width: 18px; height: 18px; border: 2px solid var(--line); border-radius: 50%; }
@@ -653,7 +656,7 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
   if (UCSUR.get("a") !== "\u{F1900}" || UCSUR.get("ku") !== "\u{F1988}") throw new Error("WORDS is out of UCSUR order");
   const FONTS = [
     { id: "nasin", name: "nasin nanpa", family: FONT },
-    { id: "linja", name: "linja pona", family: "LinjaPona", url: "fonts/linja-pona.woff2",
+    { id: "linja", name: "linja pona", family: "LinjaPona", url: "fonts/linja-pona-4.9.woff2",
       // n is in the font only as a ligature with the space after it (n + space), and a segment drawn on its own has no
       // space after it, so a lone n would come out as the Latin letter.
       lacks: new Set(["n", "majuna", "powe", "linluwi", "su", "te", "to", "kiki", "wa"]),
@@ -661,11 +664,12 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
       join: { "&": "-", "-": "-", "+": "+" },
       cart: (ws) => "[" + ws.map((w) => "_" + w).join("") + "]",
       // Only pi has a long form, in three fixed lengths (pi+, pi++, pi+++) that cover one, two and three glyphs. Other
-      // long glyphs are drawn as their words, without the line.
+      // long glyphs are drawn as their words, without the line; lined() tells the tap bubble which is which.
+      lined: (L) => L.head === "pi" && !L.rev,
       long: (L, ws) => (L.rev ? ws.join(" ") + " la" : L.head === "pi" ? "pi" + "+".repeat(Math.min(ws.length, 3)) + ws.join(" ") : L.head + " " + ws.join(" ")),
       // Its "." is a Latin period on the baseline; its middle dot (U+00B7) sits at the glyphs' middle, as sitelen pona's does.
       punct: (p) => p.replace(/,/g, "").replace(/\./g, "·") },
-    { id: "seli", name: "seli kiwen", family: "SeliKiwen", url: "fonts/sitelen-seli-kiwen.woff2",
+    { id: "seli", name: "seli kiwen", family: "SeliKiwen", url: "fonts/sitelen-seli-kiwen-2.3.woff2",
       lacks: new Set(), // every word in WORDS, te, to and wa included
       word: (w) => UCSUR.get(w),
       join: { "&": "\u200D", "-": "\u{F1995}", "+": "\u{F1996}" }, // a zero-width joiner
@@ -726,7 +730,10 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
 
   // Each font fills its em differently, so each is scaled to nasin nanpa's toki glyph and shifted to center the same
   // way: the Size setting means the same in every font. Measured once the font has loaded.
-  const loaded = new Set(["nasin"]), loading = new Map();
+  // A font that failed to load (offline, or the file is missing) stays in failed: the shelf and the dialog ask for it
+  // on every redraw, and each ask would otherwise start another fetch. It is asked for again when the connection comes
+  // back, or when the user picks it again.
+  const loaded = new Set(["nasin"]), loading = new Map(), failed = new Set();
   const fit = { nasin: { k: 1, dy: 0 } };
   function bounds(text, family) {
     ctx.font = `100px ${family}`; ctx.textBaseline = "middle";
@@ -742,7 +749,7 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
   // Loads a font once. Until it has, its segments are drawn in nasin nanpa; once it has, whatever shows it is redrawn.
   function loadFont(id) {
     const f = fontOf(id);
-    if (loaded.has(f.id)) return Promise.resolve();
+    if (loaded.has(f.id) || failed.has(f.id)) return Promise.resolve();
     if (!loading.has(f.id)) {
       const face = new FontFace(f.family, `url(${f.url})`, { display: "block" });
       document.fonts.add(face);
@@ -750,7 +757,7 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
       // still be on their way, and a fit measured against the fallback font would be kept for the session.
       loading.set(f.id, face.load().then(() => document.fonts.load(`100px ${FONT}`, "toki")).then(
         () => { fit[f.id] = measureFit(f); loaded.add(f.id); fontLoaded(f.id); },
-        () => { loading.delete(f.id); document.fonts.delete(face); }));
+        () => { loading.delete(f.id); document.fonts.delete(face); failed.add(f.id); fontFailed(f.id); }));
     }
     return loading.get(f.id);
   }
@@ -901,12 +908,12 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
     const gap = size * 0.3;
     const rows = [];
     // A row is room for glyphs 0.55 em above and below its middle. A glyph in another font can reach further, like the
-    // low line of a long glyph in seli kiwen, so the row takes the overflow as extra room above (up) and below (down).
-    // nasin nanpa segments are not measured for this, so its images keep their spacing.
+    // low line of a long glyph in seli kiwen: each segment notes how far (over), and the row takes the most of it as
+    // extra room above (up) and below (down). nasin nanpa segments are not measured for this, so its images keep their spacing.
     const reach = 0.6 * size;
     const push = (segs, w) => {
       let up = 0, down = 0;
-      for (const s of segs) if (s.ink) { up = Math.max(up, s.ink.up - reach); down = Math.max(down, s.ink.down - reach); }
+      for (const s of segs) if (s.over) { up = Math.max(up, s.over.up); down = Math.max(down, s.over.down); }
       rows.push({ segs, w, up, down });
     };
     ctx.textBaseline = "middle";
@@ -917,8 +924,8 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
         ctx.font = seg.run.font;
         const m = ctx.measureText(seg.run.text);
         seg.w = m.width;
-        seg.ink = seg.run.family && seg.run.family !== FONT
-          ? { up: m.actualBoundingBoxAscent - seg.run.dy, down: m.actualBoundingBoxDescent + seg.run.dy } : null;
+        seg.over = seg.run.family && seg.run.family !== FONT
+          ? { up: Math.max(0, m.actualBoundingBoxAscent - seg.run.dy - reach), down: Math.max(0, m.actualBoundingBoxDescent + seg.run.dy - reach) } : null;
         const add = (row.length ? gap : 0) + seg.w;
         if (row.length && w + add > maxW) { push(row, w); row = [seg]; w = seg.w; }
         else { row.push(seg); w += add; }
@@ -976,7 +983,8 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
       for (const seg of row.segs) {
         g.font = seg.run.font;
         g.fillText(seg.run.text, x, y + seg.run.dy);
-        if (!empty) c.boxes.push({ seg, x, y: y - size * 0.55, w: seg.w, h: size * 1.1, size });
+        const over = seg.over || { up: 0, down: 0 }; // the box follows the glyph's reach, so a tap on a low line hits
+        if (!empty) c.boxes.push({ seg, x, y: y - size * 0.55 - over.up, w: seg.w, h: size * 1.1 + over.up + over.down, size });
         x += seg.w + gap;
       }
     });
@@ -1103,10 +1111,13 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
   for (const f of FONTS) {
     const img = el("img", { alt: "" });
     fontImgs.set(f.id, img);
-    fontGroup.append(el("button", { type: "button", "data-v": f.id, "aria-pressed": "false" }, img, el("span", {}, f.name)));
+    fontGroup.append(el("button", { type: "button", "data-v": f.id, "aria-pressed": "false" }, img, el("span", {}, f.name), el("small", {}, "Couldn't load")));
   }
   function syncFont() {
-    for (const b of fontGroup.children) b.setAttribute("aria-pressed", String(b.dataset.v === state.font));
+    for (const b of fontGroup.children) {
+      b.setAttribute("aria-pressed", String(b.dataset.v === state.font));
+      b.toggleAttribute("data-failed", failed.has(b.dataset.v));
+    }
   }
   function syncFontPick() {
     if (!optsEl.open || !fontsReady) return;
@@ -1124,6 +1135,7 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
   function setFont(id) { state.font = id; store.set("font", id); syncFont(); if (sheetBuilt) syncSheetGlyphs(); }
   fontGroup.addEventListener("click", (e) => {
     const b = e.target.closest("button"); if (!b) return;
+    failed.delete(b.dataset.v); // picking a font again is how to ask for it again
     setFont(b.dataset.v); loadFont(state.font); render();
   });
   // A font has arrived: redraw whatever shows it.
@@ -1133,6 +1145,17 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
     else syncFontPick();
     if (recents.some((r) => settingsOf(r).font === id)) renderShelf();
   }
+  // A font did not arrive: its card says so, and so does a toast when it is the font the image is drawn in.
+  function fontFailed(id) {
+    syncFont();
+    if (fontsReady && id === state.font) toast(fontOf(id).name + " couldn't load. The image is in nasin nanpa for now.");
+  }
+  // Back online: ask again for the fonts that something shows.
+  addEventListener("online", () => {
+    const again = [...failed];
+    failed.clear(); syncFont();
+    for (const id of again) if (id === state.font || recents.some((r) => settingsOf(r).font === id)) loadFont(id);
+  });
   $("opts-done").addEventListener("click", () => optsEl.close());
   optsEl.addEventListener("click", (e) => { if (e.target === optsEl) optsEl.close(); });
 
@@ -1784,8 +1807,13 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
   const bare = (t) => t.replace(TRAIL, "");
   function gloss(seg) {
     if (!seg.glyph) return "not toki pona, drawn as letters";
-    if (seg.name) return "a name, one glyph per sound: " + [...seg.name.toLowerCase()].map((ch) => SOUND[ch]).filter(Boolean).join(" ");
-    if (seg.long) return "a long glyph: " + seg.long.head + (seg.long.rev ? " stretches back under " : " stretches under ") + seg.long.words;
+    if (seg.name) return "a name, one glyph per sound: " + nameSounds(seg.name).join(" ");
+    if (seg.long) {
+      // seg.run is the paint's. A long glyph the chosen font drew itself, but has no line for, stands as its words.
+      const L = seg.long, f = fontOf(state.font), plain = seg.run.family !== FONT && f.lined && !f.lined(L);
+      if (plain) return "a long glyph, drawn as its words here: " + f.name + " has no line for " + (L.rev ? "la" : L.head);
+      return "a long glyph: " + L.head + (L.rev ? " stretches back under " : " stretches under ") + L.words;
+    }
     if (seg.t[0] === "[") return "a cartouche";
     if (!bare(seg.t)) return seg.t.includes(":") ? "a colon" : "ends the sentence, so a new line starts";
     return bare(seg.t).split(/[&+\-]/).map((p) => (MEANING.get(p) || []).join(" · ")).filter(Boolean).join(" + ");

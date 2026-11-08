@@ -2,7 +2,8 @@
 // The default sitelen pona font is embedded in index.html, so caching the shell is enough to start. The other fonts
 // in fonts/ are cached the first time the page asks for one, in their own cache that outlives a new version.
 // Bump CACHE with every deploy. The changed file is what makes the browser install this worker again,
-// and the page shows its Update banner once the new worker is installed and waiting. Bump FONTS when a font file changes.
+// and the page shows its Update banner once the new worker is installed and waiting. A font file's name carries its
+// version, so a new font is a new file; bump FONTS only to clear the old files out.
 const CACHE = "ilo-sitelen-v44";
 const FONTS = "ilo-sitelen-fonts-v1";
 const PAGE = new URL("./", self.location.href).href;
