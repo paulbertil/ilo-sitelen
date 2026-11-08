@@ -1030,10 +1030,12 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
   if (probe && navigator.canShare && navigator.canShare({ files: [probe] })) {
     shareBtn.hidden = false;
     shareBtn.addEventListener("click", async () => {
+      // Taken before the share sheet opens: a font that arrives while it is open redraws the preview, not the image sent.
+      const entry = recentNow();
       try {
         const blob = await blobNow();
         await navigator.share({ files: [new File([blob], "sitelen-pona.png", { type: "image/png" })] });
-        recordRecent();
+        recordRecent(entry);
       } catch (e) {
         if (e && e.name === "AbortError") return;
         toast("Sharing isn't available here. Use Copy instead.");
@@ -1204,11 +1206,14 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
     font: FONTS.some((f) => f.id === r.font) ? r.font : "nasin",
   });
 
-  function recordRecent(entry) {
-    // A font still on its way, or one that failed to load, drew nothing: the image went out in nasin nanpa, and the
-    // recent keeps what was sent. A recent copied again (copyRecent) comes with its own font and keeps it, even while
-    // that font is still loading; the thumbnail catches up when it arrives.
-    const e = entry || { text: textEl.value.trim(), size: state.size, style: styleId(state.style), names: state.names, sentences: state.sentences, font: loaded.has(state.font) ? state.font : "nasin" };
+  // The message and settings the preview holds now, as a recent. A font still on its way, or one that failed to load,
+  // drew nothing: the image went out in nasin nanpa, and the recent keeps what was sent.
+  function recentNow() {
+    return { text: textEl.value.trim(), size: state.size, style: styleId(state.style), names: state.names, sentences: state.sentences, font: loaded.has(state.font) ? state.font : "nasin" };
+  }
+  function recordRecent(e = recentNow()) {
+    // A recent copied again (copyRecent) comes with its own font and keeps it, even while that font is still loading;
+    // the thumbnail catches up when it arrives.
     if (!e.text) return;
     const i = recents.findIndex((r) => r.text === e.text);
     if (i >= 0) recents.splice(i, 1);
@@ -1394,7 +1399,8 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
 
   // ---------- recents on another device: a link that carries them ----------
   // "Export" packs the list (text, settings and time of each entry, never the images) into the
-  // fragment of a link to this page: a version digit, then the JSON rows deflated and base64url-encoded. A fragment
+  // fragment of a link to this page: a version digit, then the JSON rows deflated and base64url-encoded. The font is
+  // the last column, added after the first links went out: a row without it is a nasin nanpa note. A fragment
   // never leaves the browser. Opening the link here, or pasting it into the field under Recents, offers to keep both
   // lists or to replace this one. The paste field matters on iOS: a tapped link opens in Safari, whose storage the
   // Home Screen app does not share, so there the link has to be carried over by hand.
@@ -1404,7 +1410,7 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
   };
   const through = async (bytes, stream) => new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(stream)).arrayBuffer());
   async function packRecents(list) {
-    const rows = list.map((r) => { const o = settingsOf(r); return [r.text, o.size, o.style, o.names ? 1 : 0, o.sentences ? 1 : 0, r.at]; });
+    const rows = list.map((r) => { const o = settingsOf(r); return [r.text, o.size, o.style, o.names ? 1 : 0, o.sentences ? 1 : 0, r.at, o.font]; });
     const bytes = new TextEncoder().encode(JSON.stringify(rows));
     if (typeof CompressionStream === "function") return "1" + b64u.enc(await through(bytes, new CompressionStream("deflate")));
     return "0" + b64u.enc(bytes);
@@ -1420,7 +1426,7 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
     const out = [];
     for (const t of rows) {
       if (!Array.isArray(t) || typeof t[0] !== "string" || !t[0].trim() || typeof t[5] !== "number") continue;
-      out.push({ text: t[0].slice(0, 4000), ...settingsOf({ size: t[1], style: t[2], names: t[3] !== 0, sentences: t[4] !== 0 }), at: t[5] });
+      out.push({ text: t[0].slice(0, 4000), ...settingsOf({ size: t[1], style: t[2], names: t[3] !== 0, sentences: t[4] !== 0, font: t[6] }), at: t[5] });
     }
     return out.slice(0, RECENTS_MAX);
   }
