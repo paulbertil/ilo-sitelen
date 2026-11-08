@@ -3,7 +3,7 @@
 // in fonts/ are cached the first time the page asks for one, in their own cache that outlives a new version.
 // Bump CACHE with every deploy. The changed file is what makes the browser install this worker again,
 // and the page shows its Update banner once the new worker is installed and waiting. Bump FONTS when a font file changes.
-const CACHE = "ilo-sitelen-v42";
+const CACHE = "ilo-sitelen-v44";
 const FONTS = "ilo-sitelen-fonts-v1";
 const PAGE = new URL("./", self.location.href).href;
 const SHELL = [
