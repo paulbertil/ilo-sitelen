@@ -345,16 +345,13 @@ body.shelf-open .shelf { transform: none; visibility: visible; transition: trans
 .card-del:hover { color: var(--danger); }
 .card-act { padding: 6px 11px; font-size: 0.82rem; border-radius: 8px; flex: none; }
 .card-act.danger { color: var(--danger); border-color: var(--danger); }
-.s-foot { display: grid; border-top: var(--bw) solid var(--line); font-size: 0.78rem; color: var(--muted); }
-.s-foot p { margin: 0; padding: 10px 16px 8px; }
-/* Export and Import: full-width rows under the note, like a settings list. */
-.s-row { justify-content: flex-start; gap: 10px; border: 0; border-top: var(--bw) solid var(--line); border-radius: 0; background: transparent; padding: 12px 16px; font-size: 0.88rem; color: var(--fg); }
-.s-row:active { transform: none; background: var(--accent); color: var(--accent-ink); }
-.s-row:focus-visible { outline-offset: -4px; }
-.s-row svg { width: 17px; height: 17px; flex: none; color: var(--muted); }
-.s-row:active svg { color: inherit; }
-@media (hover: hover) { .s-row:hover { background: var(--accent); color: var(--accent-ink); } .s-row:hover svg { color: inherit; } }
-.s-paste { margin: 0 16px 12px; font: 500 0.95rem/1.3 var(--font); color: var(--fg); background: transparent; border: var(--bw) solid var(--line); border-radius: 999px; padding: 8px 14px; -webkit-appearance: none; appearance: none; }
+.s-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 12px; border-top: var(--bw) solid var(--line); padding: 6px 16px; font-size: 0.78rem; color: var(--muted); }
+.s-foot p { margin: 0; flex: 1 1 auto; }
+/* Export and Import: two small underlined actions at the end of the note line. */
+.s-act { gap: 5px; padding: 8px 0; border: 0; border-radius: 3px; background: transparent; font-size: 0.8rem; color: var(--fg); text-decoration: underline; text-underline-offset: 3px; }
+.s-act:active { transform: none; }
+.s-act svg { width: 14px; height: 14px; flex: none; color: var(--muted); }
+.s-paste { flex-basis: 100%; margin: 2px 0 6px; font: 500 0.95rem/1.3 var(--font); color: var(--fg); background: transparent; border: var(--bw) solid var(--line); border-radius: 999px; padding: 8px 14px; -webkit-appearance: none; appearance: none; }
 .s-acts { display: flex; flex-wrap: wrap; gap: 6px; }
 /* Recents arriving from another device: a card above the list asking what to do with them. */
 .s-import { display: grid; gap: 8px; border: var(--bw) solid var(--accent); border-radius: 14px; padding: 12px 14px; margin-top: 8px; font-size: 0.84rem; color: var(--muted); }
@@ -526,8 +523,8 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
   <div class="s-list" id="s-list"></div>
   <div class="s-foot">
     <p id="s-foot-text">Saved on this device only.</p>
-    <button type="button" class="s-row" id="s-send" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m8 7 4-4 4 4"/><path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7"/></svg>Export as a link</button>
-    <button type="button" class="s-row" id="s-recv" aria-expanded="false" aria-controls="s-paste"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.1 0l3-3a5 5 0 0 0-7.1-7.1l-1.5 1.5"/><path d="M14 11a5 5 0 0 0-7.1 0l-3 3a5 5 0 0 0 7.1 7.1l1.5-1.5"/></svg>Import from a link</button>
+    <button type="button" class="s-act" id="s-send" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m8 7 4-4 4 4"/><path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7"/></svg>Export</button>
+    <button type="button" class="s-act" id="s-recv" aria-expanded="false" aria-controls="s-paste"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.1 0l3-3a5 5 0 0 0-7.1-7.1l-1.5 1.5"/><path d="M14 11a5 5 0 0 0-7.1 0l-3 3a5 5 0 0 0 7.1 7.1l1.5-1.5"/></svg>Import</button>
     <input type="url" class="s-paste" id="s-paste" placeholder="Paste the link here" aria-label="Recents link from another device" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" hidden>
   </div>
 </aside>
@@ -1040,10 +1037,10 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
       const acts = el("div", { class: "s-acts" });
       const lines = [];
       if (pendingImport.confirm) { // Replace, asked once more: the list on this device cannot be brought back
-        lines.push(el("strong", {}, "Replace the " + here + " on this device?"), el("p", {}, "They can't be brought back."));
+        lines.push(el("strong", {}, "Replace the " + here + (here === 1 ? " note" : " notes") + " on this device?"), el("p", {}, "They can't be brought back."));
         acts.append(act("Replace", " danger", () => applyImport(true)), act("Back", "", () => { pendingImport.confirm = false; renderShelf(); }));
       } else {
-        lines.push(el("strong", {}, n + (n === 1 ? " message" : " messages") + " from another device"));
+        lines.push(el("strong", {}, n + (n === 1 ? " note" : " notes") + " from another device"));
         if (here) {
           lines.push(el("p", {}, "Keep both lists, or replace the " + here + " on this device?"));
           acts.append(act("Keep both", "", () => applyImport(false)), act("Replace", " danger", () => { pendingImport.confirm = true; renderShelf(); }));
@@ -1155,7 +1152,7 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
   setShelf(wantsShelf());
 
   // ---------- recents on another device: a link that carries them ----------
-  // "Export as a link" packs the list (text, settings and time of each entry, never the images) into the
+  // "Export" packs the list (text, settings and time of each entry, never the images) into the
   // fragment of a link to this page: a version digit, then the JSON rows deflated and base64url-encoded. A fragment
   // never leaves the browser. Opening the link here, or pasting it into the field under Recents, offers to keep both
   // lists or to replace this one. The paste field matters on iOS: a tapped link opens in Safari, whose storage the
@@ -1210,7 +1207,7 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
   });
 
   function offerImport(list, viaUrl) {
-    if (!list.length) { toast("That link holds no messages."); return; }
+    if (!list.length) { toast("That link holds no notes."); return; }
     pendingImport = { list, viaUrl };
     showPaste(false);
     setShelf(true); // renders the card; before the fonts are in, boot() renders it
@@ -1228,7 +1225,7 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
     }
     recents = next.sort((a, b) => b.at - a.at).slice(0, RECENTS_MAX);
     saveRecents(); renderShelf();
-    toast(replace && had.size ? "Recents replaced." : added ? "Added " + added + (added === 1 ? " message." : " messages.") : "All of them were here already.");
+    toast(replace && had.size ? "Recents replaced." : added ? "Added " + added + (added === 1 ? " note." : " notes.") : "All of them were here already.");
   }
 
   function showPaste(show) {
