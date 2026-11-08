@@ -276,6 +276,13 @@ label.setting { cursor: pointer; }
 .seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; padding: 4px; border: var(--bw) solid var(--line); border-radius: 999px; }
 .seg button { border: 0; padding: 7px 0; min-height: 34px; gap: 5px; font-size: 0.88rem; background: transparent; }
 .seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+/* Font: three cards, each the start of the message drawn in that font with its name under it, so they can be compared.
+   The chosen one is filled ochre, like a pressed pill. */
+.fontpick { grid-row: 3; grid-column: 1 / -1; margin-top: 10px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.fontpick button { display: grid; gap: 6px; justify-items: center; min-width: 0; padding: 6px 6px 8px; border-radius: 14px; font-size: 0.82rem; }
+.fontpick button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+.fontpick img { display: block; width: 100%; height: 44px; object-fit: contain; }
+.fontpick span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* A palette as a small round chip before its name. The Theme chip is half Dark, half White, since the image takes whichever
    the app shows: its gradient is set from the two palettes in the script. */
 .swatch-chip { flex: none; width: 18px; height: 18px; border: 2px solid var(--line); border-radius: 50%; }
@@ -514,7 +521,7 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
     <p>Type toki pona in the box above. ilo sitelen draws it in sitelen pona and gives you an image to paste into WhatsApp, Discord, Telegram or any chat. There is no font or keyboard to install, and it works offline once added to your home screen. It converts toki pona to sitelen pona, it does not translate: you write the toki pona, it draws the glyphs from the nasin nanpa font.</p>
   </details>
 
-  <footer>Created by jan Pewi · <a href="https://github.com/paulbertil" target="_blank" rel="noopener">GitHub</a><br>Glyphs from <a href="https://github.com/ETBCOR/nasin-nanpa" target="_blank" rel="noopener">nasin nanpa</a> by jan Itan (MIT license).</footer>
+  <footer>Created by jan Pewi · <a href="https://github.com/paulbertil" target="_blank" rel="noopener">GitHub</a><br>Glyphs from <a href="https://github.com/ETBCOR/nasin-nanpa" target="_blank" rel="noopener">nasin nanpa</a> by jan Itan (MIT license), <a href="https://github.com/janSame/linja-pona" target="_blank" rel="noopener">linja pona</a> by jan Same and <a href="https://github.com/kreativekorp/sitelen-seli-kiwen" target="_blank" rel="noopener">sitelen seli kiwen</a> by jan Lepeka (SIL Open Font License).</footer>
 </main>
 
 <aside class="shelf" id="shelf" aria-label="Recents">
@@ -559,6 +566,12 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
     <span class="setting-name" id="style-name">Colors</span>
     <span class="setting-help">Ink and background of the image</span>
     <div class="seg" role="group" aria-labelledby="style-name" id="style"></div>
+  </div>
+  <div class="setting">
+    <span class="setting-glyph" aria-hidden="true">sitelen</span>
+    <span class="setting-name" id="font-name">Font</span>
+    <span class="setting-help">How the glyphs look. What a font lacks is drawn in nasin nanpa</span>
+    <div class="fontpick" role="group" aria-labelledby="font-name" id="font"></div>
   </div>
   <label class="setting">
     <span class="setting-glyph" aria-hidden="true">nimi</span>
@@ -606,6 +619,144 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
   const FONT = "NasinNanpa";
   const SANS = 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
 
+  // ---------- fonts ----------
+  // nasin nanpa is embedded and reads the app's own notation (toki&pona, mute1, [ilo]) as ligatures, so its segments are
+  // drawn as typed. The other two load from fonts/ the first time they are needed, and each gets a segment spelled its
+  // own way: linja pona has its own ligatures (toki-pona, [_mama_ala]); sitelen seli kiwen (the juniko build) reads
+  // only the UCSUR code points. A segment a font cannot draw, a word it lacks or an alternate glyph like mute1, is
+  // drawn in nasin nanpa instead.
+  // UCSUR: WORDS starts in code point order, pu and ku suli from U+F1900 up to ku; the words after ku sit apart.
+  const UCSUR_AFTER_KU = { pake: 0xF19A0, apeja: 0xF19A1, majuna: 0xF19A2, powe: 0xF19A3, linluwi: 0xF19A4, kiki: 0xF19A5, su: 0xF19A6, te: 0xF199E, to: 0xF199F, wa: 0xF19C0 };
+  const UCSUR = new Map([...WORDS].map((w, i) => [w, String.fromCodePoint(i <= 136 ? 0xF1900 + i : UCSUR_AFTER_KU[w])]));
+  // A word added or moved before ku would shift every code point after it and draw the wrong glyphs without a word of
+  // warning, so both ends of the run are checked here.
+  if (UCSUR.get("a") !== "\u{F1900}" || UCSUR.get("ku") !== "\u{F1988}") throw new Error("WORDS is out of UCSUR order");
+  const FONTS = [
+    { id: "nasin", name: "nasin nanpa", family: FONT },
+    { id: "linja", name: "linja pona", family: "LinjaPona", url: "fonts/linja-pona.woff2",
+      lacks: new Set(["majuna", "powe", "linluwi", "su", "te", "to", "kiki", "wa"]),
+      word: (w) => w,
+      join: { "&": "-", "-": "-", "+": "+" },
+      cart: (ws) => "[" + ws.map((w) => "_" + w).join("") + "]",
+      // Only pi has a long form, in three fixed lengths (pi+, pi++, pi+++) that cover one, two and three glyphs. Other
+      // long glyphs are drawn as their words, without the line.
+      long: (L, ws) => (L.rev ? ws.join(" ") + " la" : L.head === "pi" ? "pi" + "+".repeat(Math.min(ws.length, 3)) + ws.join(" ") : L.head + " " + ws.join(" ")),
+      // Its "." is a Latin period on the baseline; its middle dot (U+00B7) sits at the glyphs' middle, as sitelen pona's does.
+      punct: (p) => p.replace(/,/g, "").replace(/\./g, "·") },
+    { id: "seli", name: "seli kiwen", family: "SeliKiwen", url: "fonts/sitelen-seli-kiwen.woff2",
+      lacks: new Set(["te", "to", "wa"]), // U+F199E is in the font but draws nothing; wa (U+F19C0) is not in it
+      word: (w) => UCSUR.get(w),
+      join: { "&": "\u200D", "-": "\u{F1995}", "+": "\u{F1996}" }, // a zero-width joiner
+      cart: (ws) => "\u{F1990}" + ws.map((w) => UCSUR.get(w)).join("") + "\u{F1991}",
+      // UCSUR long glyphs: head, start, the glyphs, end; reversed: start, the glyphs, end, la.
+      long: (L, ws) => (L.rev ? "\u{F199A}" + ws.join("") + "\u{F199B}" + UCSUR.get("la") : UCSUR.get(L.head) + "\u{F1997}" + ws.join("") + "\u{F1998}"),
+      punct: (p) => p.replace(/,/g, "").replace(/\./g, "\u{F199C}").replace(/:/g, "\u{F199D}") },
+  ];
+  const fontOf = (id) => FONTS.find((f) => f.id === id) || FONTS[0];
+
+  // Words run together, as a cartouche holds them: "mamaala" is mama, ala. Longest word first, backing off when the
+  // rest will not split. Each start is tried once, so a text that will not split (one typed halfway) stays quick.
+  function splitWords(s) {
+    const memo = new Map();
+    const from = (i) => {
+      if (i === s.length) return [];
+      if (memo.has(i)) return memo.get(i);
+      let out = null;
+      for (let n = Math.min(s.length - i, 15); n > 0 && !out; n--) {
+        const w = s.slice(i, i + n), rest = WORDS.has(w) && from(i + n);
+        if (rest) out = [w, ...rest];
+      }
+      memo.set(i, out);
+      return out;
+    };
+    return from(0);
+  }
+  // A glyph segment spelled for font f, or null when f cannot draw all of it.
+  // A long glyph, pi(toki pona), is spelled from its words, each spelled on its own; the font's long() joins them.
+  // Syllable ticks in a cartouche, [pona,,], stay with nasin nanpa, since a comma does not split into words.
+  function spell(seg, f) {
+    const can = (w) => WORDS.has(w) && !f.lacks.has(w);
+    if (seg.long) {
+      const inner = parseLine(seg.long.words, false);
+      if (!inner.length || inner.some((s) => !s.glyph)) return null;
+      const ws = inner.map((s) => spell(s, f));
+      if (ws.some((w) => w == null) || !(seg.long.rev || can(seg.long.head))) return null;
+      return f.long(seg.long, ws);
+    }
+    if (seg.t[0] === "[") {
+      const end = seg.t.indexOf("]"), inner = seg.t.slice(1, end);
+      const ws = (seg.parts || [inner]).map(splitWords);
+      if (ws.some((w) => !w)) return null;
+      const flat = ws.flat();
+      return flat.every(can) ? f.cart(flat) + f.punct(seg.t.slice(end + 1)) : null;
+    }
+    const p = (seg.t.match(TRAIL) || [""])[0], core = seg.t.slice(0, seg.t.length - p.length);
+    if (!core) return f.punct(p);
+    const bits = core.split(/([&+\-])/);
+    let out = "";
+    for (let i = 0; i < bits.length; i++) {
+      if (i % 2) { out += f.join[bits[i]]; continue; }
+      if (!can(bits[i])) return null; // an alternate (mute1) is not a word here, so it goes to nasin nanpa too
+      out += f.word(bits[i]);
+    }
+    return out + f.punct(p);
+  }
+
+  // Each font fills its em differently, so each is scaled to nasin nanpa's toki glyph and shifted to center the same
+  // way: the Size setting means the same in every font. Measured once the font has loaded.
+  const loaded = new Set(["nasin"]), loading = new Map();
+  const fit = { nasin: { k: 1, dy: 0 } };
+  function bounds(text, family) {
+    ctx.font = `100px ${family}`; ctx.textBaseline = "middle";
+    const m = ctx.measureText(text);
+    return { h: m.actualBoundingBoxAscent + m.actualBoundingBoxDescent, mid: (m.actualBoundingBoxDescent - m.actualBoundingBoxAscent) / 2 };
+  }
+  function measureFit(f) {
+    const a = bounds("toki", FONT), b = bounds(f.word("toki"), f.family);
+    if (!a.h || !b.h) return { k: 1, dy: 0 };
+    const k = a.h / b.h;
+    return { k, dy: (a.mid - b.mid * k) / 100 };
+  }
+  // Loads a font once. Until it has, its segments are drawn in nasin nanpa; once it has, whatever shows it is redrawn.
+  function loadFont(id) {
+    const f = fontOf(id);
+    if (loaded.has(f.id)) return Promise.resolve();
+    if (!loading.has(f.id)) {
+      const face = new FontFace(f.family, `url(${f.url})`, { display: "block" });
+      document.fonts.add(face);
+      // nasin nanpa is the yardstick the font is measured against, so the measuring waits for it too: at boot both may
+      // still be on their way, and a fit measured against the fallback font would be kept for the session.
+      loading.set(f.id, face.load().then(() => document.fonts.load(`100px ${FONT}`, "toki")).then(
+        () => { fit[f.id] = measureFit(f); loaded.add(f.id); fontLoaded(f.id); },
+        () => { loading.delete(f.id); document.fonts.delete(face); }));
+    }
+    return loading.get(f.id);
+  }
+  // How a segment is drawn at a size: its text, the CSS font, and the shift down from the row's middle.
+  function runFor(seg, size, id) {
+    if (!seg.glyph) return { text: seg.t, font: `600 ${Math.round(size * 0.42)}px ${SANS}`, dy: 0 };
+    const f = fontOf(id), text = f.url && loaded.has(f.id) ? spell(seg, f) : null;
+    if (text == null) return { text: seg.t, font: `${size}px ${FONT}`, dy: 0, family: FONT, k: 1 };
+    const { k, dy } = fit[f.id];
+    return { text, font: `${size * k}px ${f.family}, ${FONT}`, dy: dy * size, family: `${f.family}, ${FONT}`, k };
+  }
+  // Glyphs in the page (a cheat sheet tile, the tap bubble) drawn as the image would draw them in the chosen font.
+  // nasin nanpa keeps the text as it is; another font gets one span per segment, spelled, scaled and shifted.
+  function setGlyphs(node, str, segs) {
+    if (state.font === "nasin") { node.textContent = str; return; }
+    const kids = [];
+    (segs || parseLine(str, true)).forEach((s, i) => {
+      const r = runFor(s, 1, state.font);
+      if (i) kids.push(" ");
+      const span = el("span", {}, r.text);
+      // Scaled up, a glyph outgrows the parent's line box; "normal" gives it the font's own ascent and descent instead,
+      // and a vertical-align shift (unlike a relative top) makes the line box room for the glyph it moves.
+      if (r.family && r.family !== FONT) Object.assign(span.style, { fontFamily: r.family, fontSize: r.k + "em", lineHeight: "normal", verticalAlign: -r.dy / r.k + "em" });
+      kids.push(span);
+    });
+    node.replaceChildren(...kids);
+  }
+
   const $ = (id) => document.getElementById(id);
   const textEl = $("text"), outEl = $("out"), unknownEl = $("unknown"), toastEl = $("toast");
   const copyBtn = $("copy"), shareBtn = $("share"), saveLink = $("save");
@@ -624,8 +775,10 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
     style: store.get("style", AUTO),
     names: store.get("names", "1") === "1",
     sentences: store.get("sentences", "1") === "1",
+    font: store.get("font", "nasin"),
   };
   if (!SIZES[state.size]) state.size = "s";
+  if (!FONTS.some((f) => f.id === state.font)) state.font = "nasin";
   if (state.style !== AUTO && !STYLES.some((s) => s.id === state.style)) state.style = AUTO;
   const savedText = store.get("text", null);
   if (savedText !== null) textEl.value = savedText;
@@ -643,9 +796,13 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
     });
   }
 
-  function nameToCartouche(name) {
+  function nameSounds(name) {
     const glyphs = [];
     for (const ch of name.toLowerCase()) if (SOUND[ch]) glyphs.push(SOUND[ch]);
+    return glyphs;
+  }
+  function nameToCartouche(name) {
+    const glyphs = nameSounds(name);
     return glyphs.length ? "[" + glyphs.join("") + "]" : null;
   }
 
@@ -655,6 +812,7 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
   const LONG = new Set("a alasa anu awen kama ken kepeken lon nanpa open pi pini sona tawa wile wile1 n".split(" "));
 
   // Each segment keeps where it came from in the text (from, to) and, for a name, the name as typed, for the glyph tap below.
+  // A cartouche also keeps its words (parts), as typed between spaces or one per sound, for fonts that spell it their way.
   // Tokens: a cartouche, a long-glyph run (head word, optional space, parentheses), a reverse run ending in la, or a word.
   function parseLine(line, names, base = 0) {
     const segs = [];
@@ -668,8 +826,8 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
     const len = tok.length;
     const at = (seg, a = 0, b = len) => { seg.from = from + a; seg.to = from + b; return seg; };
     if (tok[0] === "[") {
-      const inner = tok.replace(/^\[|\]$/g, "").replace(/\s+/g, "");
-      return inner ? [at({ t: "[" + inner.toLowerCase() + "]", glyph: true })] : [];
+      const parts = tok.replace(/^\[|\]$/g, "").toLowerCase().split(/\s+/).filter(Boolean);
+      return parts.length ? [at({ t: "[" + parts.join("") + "]", glyph: true, parts })] : [];
     }
     const head = /^([A-Za-z0-9&+\-]+)\s*\(/.exec(tok), rev = /^[({][^)}]*[)}]\s*la$/.test(tok);
     if (head || rev) {
@@ -693,7 +851,7 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
     const core = tok.replace(TRAIL, "");
     if (!core) return punct ? [at({ t: punct, glyph: true })] : [];
     if (isKnown(core)) return [at({ t: core.toLowerCase() + punct, glyph: true })];
-    if (names && /^[A-Z][A-Za-z]*$/.test(core) && nameToCartouche(core)) return [at({ t: nameToCartouche(core) + punct, glyph: true, name: core })];
+    if (names && /^[A-Z][A-Za-z]*$/.test(core) && nameToCartouche(core)) return [at({ t: nameToCartouche(core) + punct, glyph: true, name: core, parts: nameSounds(core) })];
     return [at({ t: core + punct, glyph: false })];
   }
 
@@ -714,24 +872,34 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
   // Measuring context; each image is drawn on its own canvas in paint().
   const ctx = document.createElement("canvas").getContext("2d");
 
-  function fontFor(seg, size) {
-    return seg.glyph ? `${size}px ${FONT}` : `600 ${Math.round(size * 0.42)}px ${SANS}`;
-  }
-
-  function layout(lines, size, maxGlyphs) {
+  function layout(lines, size, maxGlyphs, font) {
     const maxW = size * maxGlyphs;
     const gap = size * 0.3;
     const rows = [];
+    // A row is room for glyphs 0.55 em above and below its middle. A glyph in another font can reach further, like the
+    // low line of a long glyph in seli kiwen, so the row takes the overflow as extra room above (up) and below (down).
+    // nasin nanpa segments are not measured for this, so its images keep their spacing.
+    const reach = 0.6 * size;
+    const push = (segs, w) => {
+      let up = 0, down = 0;
+      for (const s of segs) if (s.ink) { up = Math.max(up, s.ink.up - reach); down = Math.max(down, s.ink.down - reach); }
+      rows.push({ segs, w, up, down });
+    };
+    ctx.textBaseline = "middle";
     for (const segs of lines) {
       let row = [], w = 0;
       for (const seg of segs) {
-        ctx.font = fontFor(seg, size);
-        seg.w = ctx.measureText(seg.t).width;
+        seg.run = runFor(seg, size, font);
+        ctx.font = seg.run.font;
+        const m = ctx.measureText(seg.run.text);
+        seg.w = m.width;
+        seg.ink = seg.run.family && seg.run.family !== FONT
+          ? { up: m.actualBoundingBoxAscent - seg.run.dy, down: m.actualBoundingBoxDescent + seg.run.dy } : null;
         const add = (row.length ? gap : 0) + seg.w;
-        if (row.length && w + add > maxW) { rows.push({ segs: row, w }); row = [seg]; w = seg.w; }
+        if (row.length && w + add > maxW) { push(row, w); row = [seg]; w = seg.w; }
         else { row.push(seg); w += add; }
       }
-      rows.push({ segs: row, w });
+      push(row, w);
     }
     return { rows, gap };
   }
@@ -759,14 +927,15 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
     const st = STYLES.find((s) => s.id === styleId(opts.style)) || STYLES[0];
     const size = SIZES[opts.size] || SIZES.s;
     const empty = !lines.length;
-    const { rows, gap } = layout(empty ? [[{ t: "toki", glyph: true }]] : lines, size, opts.sentences ? GLYPHS_PER_SENTENCE_LINE : GLYPHS_PER_LINE);
+    const { rows, gap } = layout(empty ? [[{ t: "toki", glyph: true }]] : lines, size, opts.sentences ? GLYPHS_PER_SENTENCE_LINE : GLYPHS_PER_LINE, opts.font);
 
     const pad = Math.round(size * 0.45);
     const lineH = Math.round(size * 1.3);
     const contentW = Math.max(size, ...rows.map((r) => r.w));
     const c = document.createElement("canvas");
     c.width = Math.ceil(contentW + pad * 2);
-    c.height = Math.ceil(rows.length * lineH - (lineH - size * 1.1) + pad * 2);
+    const extra = rows.reduce((n, r) => n + r.up + r.down, 0);
+    c.height = Math.ceil(rows.length * lineH - (lineH - size * 1.1) + pad * 2 + extra);
     const g = c.getContext("2d");
     g.fillStyle = st.bg;
     g.fillRect(0, 0, c.width, c.height);
@@ -774,12 +943,15 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
     if (empty) g.globalAlpha = 0.25;
     g.textBaseline = "middle";
     c.boxes = []; // where each segment landed, in canvas pixels, for the glyph tap
+    let shift = 0; // the extra room of the rows so far
     rows.forEach((row, i) => {
       let x = pad;
-      const y = pad + i * lineH + size * 0.55;
+      shift += row.up;
+      const y = pad + i * lineH + size * 0.55 + shift;
+      shift += row.down;
       for (const seg of row.segs) {
-        g.font = fontFor(seg, size);
-        g.fillText(seg.t, x, y);
+        g.font = seg.run.font;
+        g.fillText(seg.run.text, x, y + seg.run.dy);
         if (!empty) c.boxes.push({ seg, x, y: y - size * 0.55, w: seg.w, h: size * 1.1, size });
         x += seg.w + gap;
       }
@@ -791,6 +963,7 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
     const c = paint(textEl.value, state);
     lastPaint = c;
     syncTap(); // also sets the "Not toki pona" notice, from the segments, with the word at the caret left out
+    syncFontPick(); // the font cards follow the colors and names settings while the dialog is open
 
     renderPromise = new Promise((resolve) => c.toBlob((blob) => {
       currentBlob = blob;
@@ -895,7 +1068,45 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
   // it (Escape is the dialog's own cancel), and the dialog hands focus back to the chip. The card fills the dialog, so a
   // tap on the dialog itself is the scrim.
   const optsEl = $("opts"), optsBtn = $("opts-btn");
-  optsBtn.addEventListener("click", () => optsEl.showModal());
+  optsBtn.addEventListener("click", () => { optsEl.showModal(); syncFontPick(); for (const f of FONTS) loadFont(f.id); });
+
+  // Font: a card per font, each drawing the first few words of the message in it, so the three can be compared.
+  // As many words as fit the card's shape, at least one. The cards are drawn while the dialog is open, and again as
+  // each font arrives.
+  const fontGroup = $("font"), fontImgs = new Map();
+  for (const f of FONTS) {
+    const img = el("img", { alt: "" });
+    fontImgs.set(f.id, img);
+    fontGroup.append(el("button", { type: "button", "data-v": f.id, "aria-pressed": "false" }, img, el("span", {}, f.name)));
+  }
+  function syncFont() {
+    for (const b of fontGroup.children) b.setAttribute("aria-pressed", String(b.dataset.v === state.font));
+  }
+  function syncFontPick() {
+    if (!optsEl.open || !fontsReady) return;
+    const line = textEl.value.split("\n").find((l) => l.trim()) || "toki pona li pona";
+    const words = line.trim().split(/\s+/), o = { ...state, size: "s", sentences: true };
+    let n = 1;
+    while (n < Math.min(words.length, 5)) {
+      const c = paint(words.slice(0, n + 1).join(" "), o);
+      if (c.width / c.height > 2.6) break;
+      n++;
+    }
+    const sample = words.slice(0, n).join(" ");
+    for (const f of FONTS) fontImgs.get(f.id).src = paint(sample, { ...o, font: f.id }).toDataURL("image/png");
+  }
+  function setFont(id) { state.font = id; store.set("font", id); syncFont(); if (sheetBuilt) syncSheetGlyphs(); }
+  fontGroup.addEventListener("click", (e) => {
+    const b = e.target.closest("button"); if (!b) return;
+    setFont(b.dataset.v); loadFont(state.font); render();
+  });
+  // A font has arrived: redraw whatever shows it.
+  function fontLoaded(id) {
+    if (!fontsReady) return;
+    if (id === state.font) { render(); if (sheetBuilt) syncSheetGlyphs(); } // render() redraws the font cards too
+    else syncFontPick();
+    if (recents.some((r) => settingsOf(r).font === id)) renderShelf();
+  }
   $("opts-done").addEventListener("click", () => optsEl.close());
   optsEl.addEventListener("click", (e) => { if (e.target === optsEl) optsEl.close(); });
 
@@ -932,9 +1143,13 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
   darkMedia.addEventListener("change", syncTheme);
   syncTheme();
 
-  syncSize(); syncStyle();
-  function boot() { fontsReady = true; render(); renderShelf(); }
-  document.fonts.load(`64px ${FONT}`, "toki").then(boot, boot);
+  syncSize(); syncStyle(); syncFont();
+  function boot() { if (fontsReady) return; fontsReady = true; render(); renderShelf(); }
+  // The first paint waits for nasin nanpa, which every image needs. The chosen font then gets a moment to arrive; past
+  // that, nasin nanpa draws until it does.
+  document.fonts.load(`64px ${FONT}`, "toki").catch(() => {})
+    .then(() => Promise.race([loadFont(state.font), new Promise((r) => setTimeout(r, 1500))]))
+    .then(boot, boot);
 
   // ---------- recents: what you sent, as you sent it ----------
   // Copy, Share and Save count as sending. Each entry keeps the text and the four settings, never the PNG; the image
@@ -961,14 +1176,18 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
     style: STYLES.some((s) => s.id === r.style) ? r.style : "night",
     names: r.names !== false,
     sentences: r.sentences !== false,
+    font: FONTS.some((f) => f.id === r.font) ? r.font : "nasin",
   });
 
   function recordRecent(entry) {
-    const e = entry || { text: textEl.value.trim(), size: state.size, style: styleId(state.style), names: state.names, sentences: state.sentences };
+    const e = entry || { text: textEl.value.trim(), size: state.size, style: styleId(state.style), names: state.names, sentences: state.sentences, font: state.font };
     if (!e.text) return;
+    // A font still on its way, or one that failed to load, drew nothing: the image went out in nasin nanpa, and the
+    // recent keeps what was sent.
+    const font = loaded.has(e.font) ? e.font : "nasin";
     const i = recents.findIndex((r) => r.text === e.text);
     if (i >= 0) recents.splice(i, 1);
-    recents.unshift({ text: e.text, size: e.size, style: e.style, names: e.names, sentences: e.sentences, at: Date.now() });
+    recents.unshift({ text: e.text, size: e.size, style: e.style, names: e.names, sentences: e.sentences, font, at: Date.now() });
     if (recents.length > RECENTS_MAX) recents.length = RECENTS_MAX;
     saveRecents();
     renderShelf();
@@ -980,7 +1199,9 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
 
   const thumbs = new Map();
   function thumbUrl(r) {
-    const o = settingsOf(r), key = JSON.stringify([r.text, o]);
+    // A recent in a font that has not loaded yet is drawn in nasin nanpa for now, and asks for its font.
+    const o = settingsOf(r), key = JSON.stringify([r.text, o, loaded.has(o.font)]);
+    if (!loaded.has(o.font)) loadFont(o.font);
     if (!thumbs.has(key)) {
       if (thumbs.size > 2 * RECENTS_MAX) thumbs.clear();
       thumbs.set(key, paint(r.text, o).toDataURL("image/png"));
@@ -1069,7 +1290,7 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
     state.size = o.size; state.names = o.names; state.sentences = o.sentences;
     store.set("size", state.size);
     store.set("names", state.names ? "1" : "0"); store.set("sentences", state.sentences ? "1" : "0");
-    setStyle(o.style);
+    setStyle(o.style); setFont(o.font); loadFont(o.font);
     syncSize(); namesEl.checked = state.names; sentencesEl.checked = state.sentences;
     render(); syncActive();
     if (!wide.matches) setShelf(false);
@@ -1251,9 +1472,29 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
   }
   undoBtn.addEventListener("click", () => { const u = undo.pop(); if (u) putText(u.value, u.sel); });
 
+  // A tile's glyph. It keeps its text, and syncSheetGlyphs draws it in the chosen font once the sheet is built, and
+  // again when the font changes.
+  function glyphSpan(text) {
+    return el("span", { class: "wt-g", "aria-hidden": "true", "data-g": text });
+  }
+  // Whether the chosen font draws a text all by itself. Until the font has loaded everything is nasin nanpa, so all fits.
+  function fits(text) {
+    const f = fontOf(state.font);
+    if (!f.url || !loaded.has(f.id)) return true;
+    return parseLine(text, true).every((s) => !s.glyph || spell(s, f) != null);
+  }
+  // The sheet shows only what the chosen font draws: a word it lacks, an alternate or a mark it has no glyph for is
+  // left out rather than drawn in nasin nanpa.
+  function syncSheetGlyphs() {
+    for (const g of sheetBody.querySelectorAll(".wt-g[data-g]")) {
+      setGlyphs(g, g.dataset.g);
+      g.parentNode.classList.toggle("nofit", !fits(g.dataset.g));
+    }
+    filterSheet();
+  }
   function wordTile(word, gloss, alt) {
     const t = el("button", { class: "wt" + (alt ? " alt" : ""), type: "button", title: word + ": " + gloss, onclick: () => tap(t, word, "word") },
-      el("span", { class: "wt-g", "aria-hidden": "true" }, word));
+      glyphSpan(word));
     const w = el("span", { class: "wt-w" });
     if (alt) w.append(word.slice(0, -1), el("b", {}, word.slice(-1))); else w.textContent = word;
     t.append(w, el("span", { class: "wt-m" }, gloss));
@@ -1262,7 +1503,7 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
   }
   function markTile(mark, gloss, sample, kind) {
     const t = el(kind ? "button" : "div", { class: "wt mk" + (kind ? "" : " ro"), title: mark + ": " + gloss },
-      el("span", { class: "wt-g", "aria-hidden": "true" }, sample), el("span", { class: "wt-w" }, mark), el("span", { class: "wt-m" }, gloss));
+      glyphSpan(sample), el("span", { class: "wt-w" }, mark), el("span", { class: "wt-m" }, gloss));
     if (kind) { t.type = "button"; t.addEventListener("click", () => tap(t, mark, kind)); }
     if (kind === "cartouche") cartoucheTile = t;
     if (kind === "long") longTile = t;
@@ -1285,14 +1526,19 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
     frag.append(el("p", { class: "sheet-empty", id: "sheet-none", hidden: "" }, "No word matches. Try an English meaning, like “eat”."));
     sheetBody.append(frag);
     sheetBuilt = true;
+    syncSheetGlyphs();
   }
-  // Search by Latin word or English meaning; a group hides when none of its tiles match.
+  // Search by Latin word or English meaning, among the tiles the font draws; a group hides when none of its tiles show.
   function filterSheet() {
+    if (!sheetBuilt) return;
     const q = sheetQ.value.trim().toLowerCase();
     let shown = 0;
     for (const sec of sheetBody.querySelectorAll(".wg")) {
       let n = 0;
-      for (const t of sec.querySelectorAll(".wt")) { const hit = !q || t.dataset.q.includes(q); t.hidden = !hit; if (hit) n++; }
+      for (const t of sec.querySelectorAll(".wt")) {
+        const hit = !t.classList.contains("nofit") && (!q || t.dataset.q.includes(q));
+        t.hidden = !hit; if (hit) n++;
+      }
       sec.hidden = !n; shown += n;
     }
     $("sheet-none").hidden = shown > 0;
@@ -1486,8 +1732,10 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
     // The bubble over the word: the glyph as the image draws it, and the word as it is drawn, or as typed for a name,
     // a cartouche or plain letters. TRAIL would strip a cartouche's closing bracket, so that one is taken whole.
     const raw = textEl.value.slice(s.from, s.to), typed = s.t[0] === "[" || s.long ? raw : bare(raw.replace(LEAD, ""));
+    const glyph = el("span", { class: "wpop-glyph" });
+    setGlyphs(glyph, s.t, [s]);
     popEl.replaceChildren(
-      ...(s.glyph ? [el("span", { class: "wpop-glyph" }, s.t)] : []),
+      ...(s.glyph ? [glyph] : []),
       el("span", { class: "wpop-word" }, s.glyph && !s.name && !s.long && s.t[0] !== "[" ? bare(s.t) || s.t : typed),
       el("span", { class: "wpop-meaning" }, gloss(s)));
     popEl.className = "wpop show" + (s.t[0] === "[" || s.long || !s.glyph ? " wide" : "");
