@@ -626,7 +626,9 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
   // only the UCSUR code points. A segment a font cannot draw, a word it lacks or an alternate glyph like mute1, is
   // drawn in nasin nanpa instead.
   // UCSUR: WORDS starts in code point order, pu and ku suli from U+F1900 up to ku; the words after ku sit apart.
-  const UCSUR_AFTER_KU = { pake: 0xF19A0, apeja: 0xF19A1, majuna: 0xF19A2, powe: 0xF19A3, linluwi: 0xF19A4, kiki: 0xF19A5, su: 0xF19A6, te: 0xF199E, to: 0xF199F, wa: 0xF19C0 };
+  // te, to and wa are the 2026 chart's code points. nasin nanpa keeps its older ones (U+F199E, U+F199F, U+F19C0), but
+  // it is driven by ligatures, never by these; seli kiwen has U+F199E as a combining tally mark and no U+F199F or U+F19C0.
+  const UCSUR_AFTER_KU = { pake: 0xF19A0, apeja: 0xF19A1, majuna: 0xF19A2, powe: 0xF19A3, linluwi: 0xF19A4, kiki: 0xF19A5, su: 0xF19A6, te: 0xF19B4, to: 0xF19B5, wa: 0xF19B8 };
   const UCSUR = new Map([...WORDS].map((w, i) => [w, String.fromCodePoint(i <= 136 ? 0xF1900 + i : UCSUR_AFTER_KU[w])]));
   // A word added or moved before ku would shift every code point after it and draw the wrong glyphs without a word of
   // warning, so both ends of the run are checked here.
@@ -634,7 +636,9 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
   const FONTS = [
     { id: "nasin", name: "nasin nanpa", family: FONT },
     { id: "linja", name: "linja pona", family: "LinjaPona", url: "fonts/linja-pona.woff2",
-      lacks: new Set(["majuna", "powe", "linluwi", "su", "te", "to", "kiki", "wa"]),
+      // n is in the font only as a ligature with the space after it (n + space), and a segment drawn on its own has no
+      // space after it, so a lone n would come out as the Latin letter.
+      lacks: new Set(["n", "majuna", "powe", "linluwi", "su", "te", "to", "kiki", "wa"]),
       word: (w) => w,
       join: { "&": "-", "-": "-", "+": "+" },
       cart: (ws) => "[" + ws.map((w) => "_" + w).join("") + "]",
@@ -644,7 +648,7 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
       // Its "." is a Latin period on the baseline; its middle dot (U+00B7) sits at the glyphs' middle, as sitelen pona's does.
       punct: (p) => p.replace(/,/g, "").replace(/\./g, "·") },
     { id: "seli", name: "seli kiwen", family: "SeliKiwen", url: "fonts/sitelen-seli-kiwen.woff2",
-      lacks: new Set(["te", "to", "wa"]), // U+F199E is in the font but draws nothing; wa (U+F19C0) is not in it
+      lacks: new Set(), // every word in WORDS, te, to and wa included
       word: (w) => UCSUR.get(w),
       join: { "&": "\u200D", "-": "\u{F1995}", "+": "\u{F1996}" }, // a zero-width joiner
       cart: (ws) => "\u{F1990}" + ws.map((w) => UCSUR.get(w)).join("") + "\u{F1991}",
@@ -1180,14 +1184,14 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
   });
 
   function recordRecent(entry) {
-    const e = entry || { text: textEl.value.trim(), size: state.size, style: styleId(state.style), names: state.names, sentences: state.sentences, font: state.font };
-    if (!e.text) return;
     // A font still on its way, or one that failed to load, drew nothing: the image went out in nasin nanpa, and the
-    // recent keeps what was sent.
-    const font = loaded.has(e.font) ? e.font : "nasin";
+    // recent keeps what was sent. A recent copied again (copyRecent) comes with its own font and keeps it, even while
+    // that font is still loading; the thumbnail catches up when it arrives.
+    const e = entry || { text: textEl.value.trim(), size: state.size, style: styleId(state.style), names: state.names, sentences: state.sentences, font: loaded.has(state.font) ? state.font : "nasin" };
+    if (!e.text) return;
     const i = recents.findIndex((r) => r.text === e.text);
     if (i >= 0) recents.splice(i, 1);
-    recents.unshift({ text: e.text, size: e.size, style: e.style, names: e.names, sentences: e.sentences, font, at: Date.now() });
+    recents.unshift({ text: e.text, size: e.size, style: e.style, names: e.names, sentences: e.sentences, font: e.font, at: Date.now() });
     if (recents.length > RECENTS_MAX) recents.length = RECENTS_MAX;
     saveRecents();
     renderShelf();
