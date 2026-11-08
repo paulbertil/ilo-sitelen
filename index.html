@@ -628,6 +628,9 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
   // UCSUR: WORDS starts in code point order, pu and ku suli from U+F1900 up to ku; the words after ku sit apart.
   const UCSUR_AFTER_KU = { pake: 0xF19A0, apeja: 0xF19A1, majuna: 0xF19A2, powe: 0xF19A3, linluwi: 0xF19A4, kiki: 0xF19A5, su: 0xF19A6, te: 0xF199E, to: 0xF199F, wa: 0xF19C0 };
   const UCSUR = new Map([...WORDS].map((w, i) => [w, String.fromCodePoint(i <= 136 ? 0xF1900 + i : UCSUR_AFTER_KU[w])]));
+  // A word added or moved before ku would shift every code point after it and draw the wrong glyphs without a word of
+  // warning, so both ends of the run are checked here.
+  if (UCSUR.get("a") !== "\u{F1900}" || UCSUR.get("ku") !== "\u{F1988}") throw new Error("WORDS is out of UCSUR order");
   const FONTS = [
     { id: "nasin", name: "nasin nanpa", family: FONT },
     { id: "linja", name: "linja pona", family: "LinjaPona", url: "fonts/linja-pona.woff2",
@@ -643,7 +646,7 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
     { id: "seli", name: "seli kiwen", family: "SeliKiwen", url: "fonts/sitelen-seli-kiwen.woff2",
       lacks: new Set(["te", "to", "wa"]), // U+F199E is in the font but draws nothing; wa (U+F19C0) is not in it
       word: (w) => UCSUR.get(w),
-      join: { "&": "‍", "-": "\u{F1995}", "+": "\u{F1996}" },
+      join: { "&": "\u200D", "-": "\u{F1995}", "+": "\u{F1996}" }, // a zero-width joiner
       cart: (ws) => "\u{F1990}" + ws.map((w) => UCSUR.get(w)).join("") + "\u{F1991}",
       // UCSUR long glyphs: head, start, the glyphs, end; reversed: start, the glyphs, end, la.
       long: (L, ws) => (L.rev ? "\u{F199A}" + ws.join("") + "\u{F199B}" + UCSUR.get("la") : UCSUR.get(L.head) + "\u{F1997}" + ws.join("") + "\u{F1998}"),
@@ -652,14 +655,21 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
   const fontOf = (id) => FONTS.find((f) => f.id === id) || FONTS[0];
 
   // Words run together, as a cartouche holds them: "mamaala" is mama, ala. Longest word first, backing off when the
-  // rest will not split.
+  // rest will not split. Each start is tried once, so a text that will not split (one typed halfway) stays quick.
   function splitWords(s) {
-    if (!s) return [];
-    for (let n = Math.min(s.length, 15); n > 0; n--) {
-      const w = s.slice(0, n), rest = WORDS.has(w) && splitWords(s.slice(n));
-      if (rest) return [w, ...rest];
-    }
-    return null;
+    const memo = new Map();
+    const from = (i) => {
+      if (i === s.length) return [];
+      if (memo.has(i)) return memo.get(i);
+      let out = null;
+      for (let n = Math.min(s.length - i, 15); n > 0 && !out; n--) {
+        const w = s.slice(i, i + n), rest = WORDS.has(w) && from(i + n);
+        if (rest) out = [w, ...rest];
+      }
+      memo.set(i, out);
+      return out;
+    };
+    return from(0);
   }
   // A glyph segment spelled for font f, or null when f cannot draw all of it.
   // A long glyph, pi(toki pona), is spelled from its words, each spelled on its own; the font's long() joins them.
@@ -714,7 +724,9 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
     if (!loading.has(f.id)) {
       const face = new FontFace(f.family, `url(${f.url})`, { display: "block" });
       document.fonts.add(face);
-      loading.set(f.id, face.load().then(
+      // nasin nanpa is the yardstick the font is measured against, so the measuring waits for it too: at boot both may
+      // still be on their way, and a fit measured against the fallback font would be kept for the session.
+      loading.set(f.id, face.load().then(() => document.fonts.load(`100px ${FONT}`, "toki")).then(
         () => { fit[f.id] = measureFit(f); loaded.add(f.id); fontLoaded(f.id); },
         () => { loading.delete(f.id); document.fonts.delete(face); }));
     }
@@ -1091,8 +1103,8 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
   // A font has arrived: redraw whatever shows it.
   function fontLoaded(id) {
     if (!fontsReady) return;
-    if (id === state.font) { render(); if (sheetBuilt) syncSheetGlyphs(); }
-    syncFontPick();
+    if (id === state.font) { render(); if (sheetBuilt) syncSheetGlyphs(); } // render() redraws the font cards too
+    else syncFontPick();
     if (recents.some((r) => settingsOf(r).font === id)) renderShelf();
   }
   $("opts-done").addEventListener("click", () => optsEl.close());
@@ -1133,11 +1145,11 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
 
   syncSize(); syncStyle(); syncFont();
   function boot() { if (fontsReady) return; fontsReady = true; render(); renderShelf(); }
-  // The chosen font gets a moment to arrive before the first paint; past that, nasin nanpa draws until it does.
-  Promise.race([
-    Promise.all([document.fonts.load(`64px ${FONT}`, "toki"), loadFont(state.font)]),
-    new Promise((r) => setTimeout(r, 1500)),
-  ]).then(boot, boot);
+  // The first paint waits for nasin nanpa, which every image needs. The chosen font then gets a moment to arrive; past
+  // that, nasin nanpa draws until it does.
+  document.fonts.load(`64px ${FONT}`, "toki").catch(() => {})
+    .then(() => Promise.race([loadFont(state.font), new Promise((r) => setTimeout(r, 1500))]))
+    .then(boot, boot);
 
   // ---------- recents: what you sent, as you sent it ----------
   // Copy, Share and Save count as sending. Each entry keeps the text and the four settings, never the PNG; the image
@@ -1170,9 +1182,12 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
   function recordRecent(entry) {
     const e = entry || { text: textEl.value.trim(), size: state.size, style: styleId(state.style), names: state.names, sentences: state.sentences, font: state.font };
     if (!e.text) return;
+    // A font still on its way, or one that failed to load, drew nothing: the image went out in nasin nanpa, and the
+    // recent keeps what was sent.
+    const font = loaded.has(e.font) ? e.font : "nasin";
     const i = recents.findIndex((r) => r.text === e.text);
     if (i >= 0) recents.splice(i, 1);
-    recents.unshift({ text: e.text, size: e.size, style: e.style, names: e.names, sentences: e.sentences, font: e.font, at: Date.now() });
+    recents.unshift({ text: e.text, size: e.size, style: e.style, names: e.names, sentences: e.sentences, font, at: Date.now() });
     if (recents.length > RECENTS_MAX) recents.length = RECENTS_MAX;
     saveRecents();
     renderShelf();
@@ -1457,11 +1472,10 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
   }
   undoBtn.addEventListener("click", () => { const u = undo.pop(); if (u) putText(u.value, u.sel); });
 
-  // A tile's glyph, in the chosen font; it keeps its text to be drawn again when the font changes.
+  // A tile's glyph. It keeps its text, and syncSheetGlyphs draws it in the chosen font once the sheet is built, and
+  // again when the font changes.
   function glyphSpan(text) {
-    const g = el("span", { class: "wt-g", "aria-hidden": "true", "data-g": text });
-    setGlyphs(g, text);
-    return g;
+    return el("span", { class: "wt-g", "aria-hidden": "true", "data-g": text });
   }
   // Whether the chosen font draws a text all by itself. Until the font has loaded everything is nasin nanpa, so all fits.
   function fits(text) {
