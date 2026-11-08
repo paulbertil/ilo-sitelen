@@ -105,7 +105,7 @@ body {
 }
 
 /* Focus: an ochre ring a little way out from the edge, so it reads on the ochre controls too. */
-:is(button, .btn, textarea, .switch, .sheet-q):focus-visible { outline: var(--bw) solid var(--accent); outline-offset: 3px; }
+:is(button, .btn, textarea, .switch, .sheet-q, .s-paste):focus-visible { outline: var(--bw) solid var(--accent); outline-offset: 3px; }
 
 /* Banners at the top of the page: the install hint, and the Update offer when a new version is waiting. */
 .banner {
@@ -345,7 +345,15 @@ body.shelf-open .shelf { transform: none; visibility: visible; transition: trans
 .card-del:hover { color: var(--danger); }
 .card-act { padding: 6px 11px; font-size: 0.82rem; border-radius: 8px; flex: none; }
 .card-act.danger { color: var(--danger); border-color: var(--danger); }
-.s-foot { margin: 0; border-top: var(--bw) solid var(--line); padding: 10px 16px; font-size: 0.78rem; color: var(--muted); }
+.s-foot { display: grid; gap: 8px; border-top: var(--bw) solid var(--line); padding: 10px 16px; font-size: 0.78rem; color: var(--muted); }
+.s-foot p { margin: 0; }
+.s-acts { display: flex; flex-wrap: wrap; gap: 6px; }
+.s-paste { width: 100%; font: 500 0.95rem/1.3 var(--font); color: var(--fg); background: transparent; border: var(--bw) solid var(--line); border-radius: 999px; padding: 8px 14px; -webkit-appearance: none; appearance: none; }
+/* Recents arriving from another device: a card above the list asking what to do with them. */
+.s-import { display: grid; gap: 8px; border: var(--bw) solid var(--accent); border-radius: 14px; padding: 12px 14px; margin-top: 8px; font-size: 0.84rem; color: var(--muted); }
+.s-import strong { font: 700 0.95rem/1.25 var(--font); color: var(--fg); }
+.s-import p { margin: 0; }
+.s-import .s-acts { margin-top: 2px; }
 @media (min-width: 900px) {
   body { transition: padding-left .22s ease, padding-right .22s ease; }
   body.shelf-open { padding-left: var(--shelf-w); }
@@ -509,7 +517,14 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
     <button type="button" class="icon-btn" id="s-close" aria-label="Hide recents" title="Hide recents"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9.5 4v16"/></svg></button>
   </div>
   <div class="s-list" id="s-list"></div>
-  <p class="s-foot" id="s-foot">Saved on this device only.</p>
+  <div class="s-foot">
+    <p id="s-foot-text">Saved on this device only.</p>
+    <div class="s-acts">
+      <button type="button" class="card-act" id="s-send" hidden>Send to another device</button>
+      <button type="button" class="card-act" id="s-recv" aria-expanded="false" aria-controls="s-paste">Add from a link</button>
+    </div>
+    <input type="url" class="s-paste" id="s-paste" placeholder="Paste the link here" aria-label="Recents link from another device" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" hidden>
+  </div>
 </aside>
 <div class="sheet-scrim" id="sheet-scrim" hidden></div>
 <section class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title" hidden>
@@ -595,6 +610,8 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
   const textEl = $("text"), outEl = $("out"), unknownEl = $("unknown"), toastEl = $("toast");
   const copyBtn = $("copy"), shareBtn = $("share"), saveLink = $("save");
   const recentsBtn = $("recents-btn"), shelfList = $("s-list"), scrimEl = $("scrim");
+  const sendBtn = $("s-send"), recvBtn = $("s-recv"), pasteEl = $("s-paste");
+  let pendingImport = null; // { list, viaUrl }: recents from a link, waiting for Keep both or Replace
   // The "Check the cheat sheet." link in the Not toki pona line; render() needs it from the first paint.
   const sheetLink = el("button", { class: "linkbtn", type: "button", onclick: () => setSheet(true) }, "cheat sheet");
 
@@ -940,7 +957,8 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
     } catch { return []; }
   }
   let recents = loadRecents();
-  const saveRecents = () => store.set("recents", JSON.stringify(recents));
+  let linkReady = null; // promise of the link that carries this list; see "recents on another device"
+  const saveRecents = () => { store.set("recents", JSON.stringify(recents)); linkReady = null; };
   const settingsOf = (r) => ({
     size: SIZES[r.size] ? r.size : "s",
     style: STYLES.some((s) => s.id === r.style) ? r.style : "night",
@@ -1010,6 +1028,19 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
     if (!fontsReady) return;
     shelfList.replaceChildren();
     cards = [];
+    sendBtn.hidden = !recents.length;
+    if (pendingImport) {
+      const n = pendingImport.list.length, here = recents.length;
+      const act = (label, cls, fn) => el("button", { class: "card-act" + cls, type: "button", onclick: fn }, label);
+      const acts = el("div", { class: "s-acts" });
+      if (here) acts.append(act("Keep both", "", () => applyImport(false)), act("Replace", " danger", () => applyImport(true)));
+      else acts.append(act("Add them", "", () => applyImport(true)));
+      acts.append(act("Not now", "", () => { pendingImport = null; renderShelf(); }));
+      const lines = [el("strong", {}, n + (n === 1 ? " message" : " messages") + " from another device")];
+      if (here) lines.push(el("p", {}, "Keep both lists, or replace the " + here + " on this device?"));
+      if (pendingImport.viaUrl && iOS && !standalone) lines.push(el("p", {}, "For your Home Screen app, paste the link under its Recents instead."));
+      shelfList.append(el("section", { class: "s-import", "aria-label": "Recents from another device" }, ...lines, acts));
+    }
     if (!recents.length) {
       shelfList.append(el("p", { class: "s-empty" }, "Images you copy, share or save will show up here."));
       return;
@@ -1108,8 +1139,107 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && shelfOpen && !wide.matches) { setShelf(false); recentsBtn.focus(); } });
   wide.addEventListener("change", () => { setShelf(wantsShelf()); syncSheetMode(); });
   roomy.addEventListener("change", syncShelf);
-  if (iOS && !standalone) $("s-foot").textContent = "Saved on this phone only. They last longest when the app is on your Home Screen.";
+  if (iOS && !standalone) $("s-foot-text").textContent = "Saved on this phone only. They last longest when the app is on your Home Screen.";
   setShelf(wantsShelf());
+
+  // ---------- recents on another device: a link that carries them ----------
+  // "Send to another device" packs the list (text, settings and time of each entry, never the images) into the
+  // fragment of a link to this page: a version digit, then the JSON rows deflated and base64url-encoded. A fragment
+  // never leaves the browser. Opening the link here, or pasting it into the field under Recents, offers to keep both
+  // lists or to replace this one. The paste field matters on iOS: a tapped link opens in Safari, whose storage the
+  // Home Screen app does not share, so there the link has to be carried over by hand.
+  const b64u = {
+    enc(bytes) { let t = ""; for (let i = 0; i < bytes.length; i += 0x8000) t += String.fromCharCode(...bytes.subarray(i, i + 0x8000)); return btoa(t).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); },
+    dec(t) { return Uint8Array.from(atob(t.replace(/-/g, "+").replace(/_/g, "/")), (c) => c.charCodeAt(0)); },
+  };
+  const through = async (bytes, stream) => new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(stream)).arrayBuffer());
+  async function packRecents(list) {
+    const rows = list.map((r) => { const o = settingsOf(r); return [r.text, o.size, o.style, o.names ? 1 : 0, o.sentences ? 1 : 0, r.at]; });
+    const bytes = new TextEncoder().encode(JSON.stringify(rows));
+    if (typeof CompressionStream === "function") return "1" + b64u.enc(await through(bytes, new CompressionStream("deflate")));
+    return "0" + b64u.enc(bytes);
+  }
+  async function unpackRecents(payload) {
+    let bytes = b64u.dec(payload.slice(1));
+    if (payload[0] === "1") {
+      if (typeof DecompressionStream !== "function") throw new Error("old-browser");
+      bytes = await through(bytes, new DecompressionStream("deflate"));
+    } else if (payload[0] !== "0") throw new Error("version");
+    const rows = JSON.parse(new TextDecoder().decode(bytes));
+    if (!Array.isArray(rows)) throw new Error("shape");
+    const out = [];
+    for (const t of rows) {
+      if (!Array.isArray(t) || typeof t[0] !== "string" || !t[0].trim() || typeof t[5] !== "number") continue;
+      out.push({ text: t[0].slice(0, 4000), ...settingsOf({ size: t[1], style: t[2], names: t[3] !== 0, sentences: t[4] !== 0 }), at: t[5] });
+    }
+    return out.slice(0, RECENTS_MAX);
+  }
+  const linkOf = (payload) => location.origin + location.pathname + "#r=" + payload;
+  // The payload sits after "#r=" in a link; the field also takes it bare.
+  function payloadOf(t) {
+    t = t.trim();
+    const m = t.match(/#r=([0-9A-Za-z_-]+)/);
+    return m ? m[1] : /^[01][0-9A-Za-z_-]{4,}$/.test(t) ? t : null;
+  }
+
+  const touch = matchMedia("(pointer: coarse)");
+  sendBtn.addEventListener("click", async () => {
+    if (!recents.length) return;
+    let url;
+    try { url = await (linkReady || (linkReady = packRecents(recents).then(linkOf))); }
+    catch { toast("Couldn't make the link here."); return; }
+    // A phone or tablet gets the share sheet, where AirDrop, Messages and Copy live; a desktop gets the clipboard.
+    if (touch.matches && navigator.share && (!navigator.canShare || navigator.canShare({ url }))) {
+      try { await navigator.share({ title: "Recents from ilo sitelen", url }); return; }
+      catch (e) { if (e && e.name === "AbortError") return; }
+    }
+    try { await navigator.clipboard.writeText(url); toast("Link copied. Open it on your other device."); }
+    catch { toast("Copying isn't allowed here."); }
+  });
+
+  function offerImport(list, viaUrl) {
+    if (!list.length) { toast("That link holds no messages."); return; }
+    pendingImport = { list, viaUrl };
+    showPaste(false);
+    setShelf(true); // renders the card; before the fonts are in, boot() renders it
+  }
+  function applyImport(replace) {
+    const { list } = pendingImport;
+    pendingImport = null;
+    const had = new Set(recents.map((r) => r.text));
+    const added = list.filter((r) => !had.has(r.text)).length;
+    let next = list;
+    if (!replace) { // keep both: one entry per text, the newer one
+      const byText = new Map();
+      for (const r of [...recents, ...list]) { const cur = byText.get(r.text); if (!cur || r.at > cur.at) byText.set(r.text, r); }
+      next = [...byText.values()];
+    }
+    recents = next.sort((a, b) => b.at - a.at).slice(0, RECENTS_MAX);
+    saveRecents(); renderShelf();
+    toast(replace && had.size ? "Recents replaced." : added ? "Added " + added + (added === 1 ? " message." : " messages.") : "All of them were here already.");
+  }
+
+  function showPaste(show) {
+    pasteEl.hidden = !show;
+    if (!show) pasteEl.value = "";
+    recvBtn.setAttribute("aria-expanded", String(show));
+    if (show) pasteEl.focus();
+  }
+  recvBtn.addEventListener("click", () => showPaste(pasteEl.hidden));
+  pasteEl.addEventListener("input", async () => {
+    const payload = payloadOf(pasteEl.value);
+    if (!payload) { if (pasteEl.value.trim().length > 20) toast("That isn't a Recents link."); return; }
+    try { offerImport(await unpackRecents(payload), false); }
+    catch (e) { toast(e && e.message === "old-browser" ? "This browser can't read the link. Update it and try again." : "That isn't a Recents link."); }
+  });
+  pasteEl.addEventListener("keydown", (e) => { if (e.key === "Escape") { e.stopPropagation(); showPaste(false); recvBtn.focus(); } });
+
+  // Arrived by link: take the payload out of the address at once, so a reload does not ask again.
+  const arriving = location.hash.match(/^#r=([0-9A-Za-z_-]+)$/);
+  if (arriving) {
+    history.replaceState(null, "", location.pathname + location.search);
+    unpackRecents(arriving[1]).then((list) => offerImport(list, true)).catch(() => toast("This link's recents couldn't be read."));
+  }
 
   // ---------- cheat sheet: every word the app draws, as a tappable glyph tile ----------
   // Groups, order and glosses are hand-curated, not derived from WORDS at run time: five function groups, ten themes,
