@@ -167,6 +167,10 @@ textarea, .mirror {
   border: var(--bw) solid var(--line); border-radius: var(--radius); padding: 20px 18px 14px;
 }
 textarea { display: block; min-height: 104px; resize: none; color: var(--fg); background: transparent; }
+/* No scrollbar in the box: a browser draws it against the inner edge of the border, where it pokes out of the rounded
+   corners and crosses the grip. A long note is read by pulling the box taller with the grip, or scrolls with the caret. */
+textarea { scrollbar-width: none; }
+textarea::-webkit-scrollbar { display: none; }
 textarea::placeholder { color: var(--muted); opacity: 0.7; }
 /* The box can be pulled taller by the grip in its corner: the browser's own grip redrawn in the box's line weight, since
    the native one is faint on this border and does not exist on iOS. The hit area is the whole corner. */
