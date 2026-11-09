@@ -357,6 +357,26 @@ body.shelf-open .shelf { transform: none; visibility: visible; transition: trans
 .card-del:hover { color: var(--danger); }
 .card-act { padding: 6px 11px; font-size: 0.82rem; border-radius: 8px; flex: none; }
 .card-act.danger { color: var(--danger); border-color: var(--danger); }
+/* A long note is folded: the image is cut off straight at --fold (set on each card by the script, FOLD px or two rows of a
+   note drawn at full size), and a chip in the corner counts the lines below the cut. .tall marks a card that runs past
+   the fold, .open one that was unfolded; the chip then sits across the bottom edge. While folded, the 2px frame moves
+   from the image to a clip around its button, so the cut edge stays a framed line (the clip is a div, not the button:
+   a browser centres a button's content, which would cut the note top and bottom), and the focus ring moves inside the
+   frame, since the clip would hide it outside. The window hugs the image, so the chip stays in the image's corner when a note
+   is narrower than the card. */
+.card-win { position: relative; min-width: 0; width: fit-content; max-width: 100%; }
+.card-clip { min-width: 0; width: fit-content; max-width: 100%; }
+.card.tall:not(.open) .card-clip { max-height: calc(var(--fold) + 4px); overflow: hidden; border: 2px solid var(--line); border-radius: 8px; }
+.card.tall:not(.open) .card-img img { border: 0; border-radius: 0; }
+.card.tall:not(.open) .card-img:focus-visible { outline-offset: -5px; }
+.card.open .card-win { margin-bottom: 14px; }
+.card-more { display: none; position: absolute; right: 8px; bottom: 8px; z-index: 1; align-items: center; gap: 5px; padding: 4px 9px; border-radius: 999px; background: var(--bg); color: var(--fg); border: 2px solid var(--line); font: 700 0.78rem/1 var(--font); white-space: nowrap; }
+.card-more::before { content: ""; position: absolute; inset: -9px; } /* a thumb-sized target: a miss would open the note instead */
+.card.tall .card-more { display: inline-flex; }
+.card.open .card-more { bottom: -14px; }
+.card-more svg { width: 14px; height: 14px; flex: none; }
+.card-more .up, .card.open .card-more .down { display: none; }
+.card.open .card-more .up { display: block; }
 .s-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 12px; border-top: var(--bw) solid var(--line); padding: 6px 16px; font-size: 0.78rem; color: var(--muted); }
 .s-foot p { margin: 0; flex: 1 1 auto; }
 /* Export and Import: two small underlined actions at the end of the note line. */
@@ -794,6 +814,7 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
     if (empty) g.globalAlpha = 0.25;
     g.textBaseline = "middle";
     c.boxes = []; // where each segment landed, in canvas pixels, for the glyph tap
+    c.fold = { rows: rows.length, lineH, pad }; // for the Recents fold: which rows sit below it
     rows.forEach((row, i) => {
       let x = pad;
       const y = pad + i * lineH + size * 0.55;
@@ -1000,11 +1021,12 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
   }
 
   const thumbs = new Map();
-  function thumbUrl(r) {
+  function thumbOf(r) {
     const o = settingsOf(r), key = JSON.stringify([r.text, o]);
     if (!thumbs.has(key)) {
       if (thumbs.size > 2 * RECENTS_MAX) thumbs.clear();
-      thumbs.set(key, paint(r.text, o).toDataURL("image/png"));
+      const c = paint(r.text, o);
+      thumbs.set(key, { url: c.toDataURL("image/png"), w: c.width, h: c.height, ...c.fold });
     }
     return thumbs.get(key);
   }
@@ -1090,14 +1112,50 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
           el("span", { class: "card-time" }, timeAgo(r.at)),
           copy, del);
       }
-      const card = el("article", { class: "card" },
-        el("button", { class: "card-img", type: "button", "aria-label": "Open: " + firstLine(r.text), onclick: () => openRecent(r) }, el("img", { src: thumbUrl(r), alt: "" })),
-        meta);
-      cards.push([card, r]);
+      const th = thumbOf(r);
+      const more = el("button", { class: "card-more", type: "button", "aria-expanded": "false", onclick: () => {
+        if (unfolded.has(r.text)) unfolded.delete(r.text); else unfolded.add(r.text);
+        foldCards();
+      } });
+      const win = el("div", { class: "card-win" },
+        el("div", { class: "card-clip" }, el("button", { class: "card-img", type: "button", "aria-label": "Open: " + firstLine(r.text), onclick: () => openRecent(r) }, el("img", { src: th.url, alt: "" }))),
+        more);
+      const card = el("article", { class: "card" }, win, meta);
+      cards.push([card, r, th, more]);
       shelfList.append(card);
     }
+    for (const t of unfolded) if (!recents.some((r) => r.text === t)) unfolded.delete(t); // a removed note comes back folded
     syncActive();
+    foldCards();
   }
+  // Which cards run past the fold, from the thumbnail's size and the card's width (one layout for all of them), and the
+  // words on each chip. A short note drawn at full size has tall rows: the fold always shows two of them, so a card's
+  // own fold can sit lower than FOLD, and a note that ends within half a row of the fold is left whole. Runs again when
+  // the list changes width: a turned phone, or a scrollbar that comes or goes.
+  const FOLD = 144;
+  const unfolded = new Set(); // texts of the cards shown in full
+  const CHEV = (cls, d) => '<svg class="' + cls + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="' + d + '"/></svg>';
+  const CHEVRONS = CHEV("down", "m6 9 6 6 6-6") + CHEV("up", "m6 15 6-6 6 6");
+  function foldCards() {
+    const w = cards.length ? cards[0][0].clientWidth - 24 : 0; // the card's 10px padding and the image's 2px frame, each side
+    if (w <= 0) return; // no layout yet
+    for (const [card, r, th, more] of cards) {
+      const shown = Math.min(w, th.w), scale = shown / th.w, h = th.h * scale;
+      const lineH = th.lineH * scale, pad = th.pad * scale;
+      const fold = Math.max(FOLD, pad + 2 * lineH), fit = Math.floor((fold - pad) / lineH);
+      const tall = h > fold + lineH / 2, open = tall && unfolded.has(r.text);
+      card.classList.toggle("tall", tall);
+      card.classList.toggle("open", open);
+      card.style.setProperty("--fold", Math.round(fold) + "px");
+      if (!tall) continue;
+      const below = th.rows - fit; // at least 1: a note that is tall runs past the rows that fit
+      more.setAttribute("aria-expanded", String(open));
+      more.setAttribute("aria-label", open ? "Show less of this note" : "Show the whole note, " + below + (below === 1 ? " more line" : " more lines"));
+      more.innerHTML = (open ? "" : "<span>+" + below + (below === 1 ? " line" : " lines") + "</span>") + CHEVRONS;
+    }
+  }
+  let listW = 0;
+  new ResizeObserver(() => { const w = shelfList.clientWidth; if (w !== listW) { listW = w; foldCards(); } }).observe(shelfList);
   // The card whose message is in the box right now.
   function syncActive() {
     const cur = textEl.value.trim();
