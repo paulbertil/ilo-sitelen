@@ -107,6 +107,12 @@ body {
 /* Focus: an ochre ring a little way out from the edge, so it reads on the ochre controls too. */
 :is(button, .btn, textarea, .switch, .sheet-q, .s-paste):focus-visible { outline: var(--bw) solid var(--accent); outline-offset: 3px; }
 
+/* Scrollbars take the app's ink: the thumb in the line colour on a clear track, wherever something scrolls (the page,
+   Recents, the settings card, the cheat sheet, the box). Only the colours are set, so each browser keeps its own
+   scrollbar: on a Mac with overlay bars the thumb still appears only while scrolling and then fades, and no gutter is
+   taken; with a mouse it is a plain bar in these colours. Safari ignores the property and keeps its grey bar. */
+html { scrollbar-color: var(--line) transparent; }
+
 /* Banners at the top of the page: the install hint, and the Update offer when a new version is waiting. */
 .banner {
   display: flex; align-items: center; gap: 12px;
