@@ -40,6 +40,8 @@
 <script>
 // A saved light or dark choice is applied before the first paint. Without one the CSS below follows the device.
 try { const t = localStorage.getItem("ilo-sitelen:theme"); if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; } catch {}
+// PROTOTYPE (prototype/inline.js): ?variant=a..d merges the box and the preview into one box.
+{ const v = new URLSearchParams(location.search).get("variant"); if (v) document.documentElement.dataset.variant = v; }
 </script>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
@@ -1709,7 +1711,13 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
   // sw.js serves the app from its cache, so a deploy ships a new sw.js. The browser installs that worker beside
   // the running one and leaves it waiting; the banner offers it, and the page reloads once it takes over.
   // The message and settings live in localStorage, so the reload keeps them.
-  if ("serviceWorker" in navigator && !window.__IS_ARTIFACT__) {
+  // PROTOTYPE: the merged box lives in prototype/inline.js and gets what it needs from here. No service worker meanwhile.
+  if (document.documentElement.dataset.variant) {
+    window.__proto = { parseLine, state, textEl, SENTENCE_END, syncTheme, gloss, bare };
+    document.head.append(el("link", { rel: "stylesheet", href: "prototype/inline.css" }));
+    document.body.append(el("script", { src: "prototype/inline.js" }));
+  }
+  if ("serviceWorker" in navigator && !window.__IS_ARTIFACT__ && !document.documentElement.dataset.variant) {
     const sw = navigator.serviceWorker;
     const banner = $("update"), btn = $("update-btn");
     let waiting = null, asked = false, reloading = false;

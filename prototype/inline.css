@@ -1,0 +1,55 @@
+/* PROTOTYPE, throwaway. The merged box: see inline.js. */
+html[data-variant] #text { position: absolute; left: 0; top: 0; width: 1px; height: 1px; min-height: 0; padding: 0; border: 0; opacity: 0; pointer-events: none; }
+html[data-variant] #mirror { display: none; }
+
+.ed-shell { position: relative; border: var(--bw) solid var(--line); border-radius: var(--radius); background: var(--paper-2); }
+/* The settings chip and the send chips, in a row under the box. */
+.ed-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 12px; }
+.ed-bar .opts-btn, .ed-bar .actions { position: static; }
+.ed-shell:focus-within { outline: var(--bw) solid var(--accent); outline-offset: 3px; }
+.ed {
+  --gs: 28px;
+  min-height: 104px; padding: 24px 18px 22px; outline: 0; cursor: text; overflow-y: auto; border-radius: calc(var(--radius) - var(--bw));
+  white-space: pre-wrap; overflow-wrap: break-word;
+  font: 600 1.05rem/calc(var(--gs) * 1.45) var(--font);
+  -webkit-user-select: text; user-select: text;
+}
+.ed:empty::before { content: "toki! mi jan Mali."; color: var(--muted); opacity: 0.7; }
+
+/* A glyph is the word itself in the sitelen pona font: the letters stay in the page, the font draws them as one glyph. */
+.ed .g { font-family: "NasinNanpa"; font-size: var(--gs); font-weight: 400; line-height: 1; vertical-align: middle; margin-inline: 2px; border-radius: 8px; }
+/* A word the box draws differently from how it is typed (a name, a long glyph): letters hidden, the drawing beside them. */
+.ed .rep { font-size: 0; margin: 0; vertical-align: 4.5px; }
+.ed .rep::before { content: attr(data-g); font: 400 var(--gs)/1 "NasinNanpa"; vertical-align: middle; margin-inline: 2px; }
+.ed .w { font-size: 1.15rem; }
+.ed .bad:not(.typing):not(.cur) { text-decoration: underline dashed var(--danger) 2px; text-underline-offset: 4px; }
+
+/* A: the word at the caret, as letters on ochre. */
+html[data-variant="a"] .ed .w.open { font-weight: 700; background: rgba(232, 197, 131, 0.5); border-radius: 7px; box-shadow: 0 0 0 4px rgba(232, 197, 131, 0.5); }
+/* B: the glyph at the caret, and the bubble with its letters. */
+html[data-variant="b"] .ed .g.cur { background: rgba(232, 197, 131, 0.5); box-shadow: 0 0 0 3px rgba(232, 197, 131, 0.5); }
+.ed-pop { position: absolute; z-index: 3; transform: translateX(-50%); background: var(--fg); color: var(--bg); font: 700 1rem/1 var(--font); padding: 7px 10px; border-radius: 10px; white-space: nowrap; pointer-events: none; }
+.ed-pop i { display: inline-block; width: 2px; height: 1em; margin: 0 1px; vertical-align: -0.14em; background: var(--accent); }
+/* D: the sentence at the caret, as plain letters. */
+html[data-variant="d"] .ed .w.open { font-weight: 600; }
+
+/* C: each word a cell, the glyph over its letters. The letters are the text you type in. */
+/* The box itself stays at 16px: under that, iOS Safari zooms the whole page in when the box gets focus. The small
+   letters are set on the cells instead. */
+html[data-variant="c"] .ed { font-size: 1rem; line-height: 1.3; }
+.ed .cell { font-size: 0.85rem; }
+.ed .cell { display: inline-block; text-align: center; min-width: calc(var(--gs) * 0.9); margin: 0 1px 10px; color: var(--muted); white-space: nowrap; border-radius: 8px; }
+.ed .cell::before { content: attr(data-g); display: block; font: 400 var(--gs)/1.2 "NasinNanpa"; height: calc(var(--gs) * 1.2); color: var(--fg); }
+.ed .cell.bad::before { content: ""; height: calc(var(--gs) * 0.9); margin: calc(var(--gs) * 0.15) 2px; border: 2px dashed var(--danger); border-radius: 8px; }
+.ed .cell.cur { color: var(--fg); background: rgba(232, 197, 131, 0.5); box-shadow: 0 0 0 3px rgba(232, 197, 131, 0.5); }
+
+/* The stand-in caret while the demo types (a frame in the compare page has no focus). */
+.ed .fc { display: inline-block; width: 2px; height: 1.2em; margin-left: 1px; vertical-align: text-bottom; background: var(--fg); animation: fc 1s steps(1) infinite; }
+html:not([data-variant="c"]) .ed .fc { height: calc(var(--gs) * 0.9); vertical-align: middle; }
+@keyframes fc { 50% { opacity: 0; } }
+
+/* The variant switcher: not part of the design. */
+.pv-bar { position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%); z-index: 99; display: flex; align-items: center; gap: 4px; padding: 4px; background: #1d4ed8; color: #fff; border-radius: 999px; font: 600 13px/1 system-ui, sans-serif; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35); white-space: nowrap; }
+.pv-bar button { all: unset; cursor: pointer; padding: 8px 12px; border-radius: 999px; }
+.pv-bar button:hover { background: rgba(255, 255, 255, 0.2); }
+.pv-bar span { padding: 0 4px; }

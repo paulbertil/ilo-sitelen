@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PROTOTYPE: one box for typing and preview</title>
+<style>
+  :root { --s: 1; }
+  body { margin: 0; font: 15px/1.4 system-ui, sans-serif; background: #d9d9d9; color: #111; }
+  header { position: sticky; top: 0; z-index: 2; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding: 10px 16px; background: #fff; border-bottom: 1px solid #bbb; }
+  header strong { margin-right: 6px; }
+  header input[type=text] { font: inherit; padding: 6px 10px; width: 300px; border: 1px solid #999; border-radius: 8px; }
+  header button { font: inherit; padding: 6px 12px; border: 1px solid #999; border-radius: 8px; background: #f3f3f3; cursor: pointer; }
+  header button.go { background: #1d4ed8; border-color: #1d4ed8; color: #fff; font-weight: 600; }
+  header label { display: inline-flex; align-items: center; gap: 6px; }
+  .row { display: flex; gap: calc(20px * var(--s)); padding: 16px; }
+  .slot { width: calc(390px * var(--s)); flex: none; }
+  .slot h2 { margin: 0 0 2px; font-size: 15px; }
+  .slot h2 a { font-weight: 400; font-size: 12px; margin-left: 6px; }
+  .slot p { margin: 0 0 8px; font-size: 12.5px; color: #333; min-height: 5.6em; }
+  .frame { width: calc(390px * var(--s)); height: calc(700px * var(--s)); overflow: hidden; border-radius: 14px; box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3); background: #fff; }
+  iframe { width: 390px; height: 700px; border: 0; transform: scale(var(--s)); transform-origin: 0 0; }
+</style>
+<header>
+  <strong>One box: four ways</strong>
+  <input type="text" id="demo-text" value="toki! mi jan Mali. mi wile moku e kili." aria-label="Sentence to type">
+  <button class="go" id="play">▶ Type it in all four</button>
+  <button id="set">Fill in at once</button>
+  <button id="clear">Clear</button>
+  <button id="dark">Dark</button>
+  <label>Glyph size <input type="range" id="gs" min="20" max="56" value="28"> <span id="gs-v">28</span>px</label>
+  <span style="color:#555">Or click into any phone and type.</span>
+</header>
+<div class="row" id="row"></div>
+<script>
+  const V = [
+    ["a", "A · Word at the caret", "The word you are on is letters, on ochre. Leave it (space, arrow, tap elsewhere) and it becomes its glyph. Tap or arrow into a glyph and it opens back into letters."],
+    ["b", "B · Instant + letter bubble", "Glyphs only. Letters turn into a glyph the moment they spell a word, also under the caret. A dark bubble over the glyph shows its letters and where the caret is in them."],
+    ["c", "C · Letters under glyphs", "Each word is a small cell: the glyph on top, its letters below. You type in the letter row and the glyph appears above. Nothing ever switches form."],
+    ["d", "D · Sentence at the caret", "The sentence you are writing is plain letters. End it and move on, and the whole sentence sets into glyphs. Tap a sentence to open it again."],
+  ];
+  const row = document.getElementById("row"), frames = [];
+  for (const [k, name, desc] of V) {
+    const slot = document.createElement("section"); slot.className = "slot";
+    slot.innerHTML = `<h2>${name}<a href="../?variant=${k}" target="_blank">open alone</a></h2><p>${desc}</p><div class="frame"><iframe src="../?variant=${k}" title="${name}"></iframe></div>`;
+    row.append(slot); frames.push(slot.querySelector("iframe"));
+  }
+  const send = (m) => frames.forEach((f) => f.contentWindow.postMessage(m, location.origin));
+  const fit = () => document.documentElement.style.setProperty("--s", Math.min(1, (innerWidth - 32 - 60) / (4 * 390)));
+  addEventListener("resize", fit); fit();
+  const t = document.getElementById("demo-text");
+  document.getElementById("play").onclick = () => send({ demo: t.value });
+  document.getElementById("set").onclick = () => send({ text: t.value });
+  document.getElementById("clear").onclick = () => send({ text: "" });
+  let dark = false;
+  document.getElementById("dark").onclick = (e) => { dark = !dark; e.target.textContent = dark ? "Light" : "Dark"; send({ theme: dark ? "dark" : "light" }); };
+  document.getElementById("gs").oninput = (e) => { document.getElementById("gs-v").textContent = e.target.value; send({ gs: +e.target.value }); };
+</script>
+</html>
