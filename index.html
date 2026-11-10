@@ -197,9 +197,9 @@ textarea::placeholder { color: var(--muted); opacity: 0.7; }
   border: var(--bw) solid var(--line); border-radius: 14px;
   -webkit-touch-callout: default;
 }
-/* Tap a glyph in the preview to find its word: the glyph and the word get the same ochre ring, and a bubble over the word
-   shows the glyph, the word and its meaning. The image sits in a wrap so the ring can be laid over it; the overlay lets
-   taps and the long press through to the image. */
+/* Tap a glyph in the preview to find its word: the glyph and the word get the same ochre ring, and a bubble above the
+   glyph shows it big with the word and its meaning. The image sits in a wrap so the ring can be laid over it; the overlay
+   lets taps and the long press through to the image. */
 .out-wrap { position: relative; display: inline-block; max-width: 100%; vertical-align: top; }
 .out-ring { position: absolute; inset: var(--bw); pointer-events: none; }
 .ring { position: absolute; box-sizing: border-box; border: 3px solid var(--accent); background: rgba(232, 197, 131, 0.28); border-radius: 12px; opacity: 0; transition: left .14s, top .14s, width .14s, height .14s, opacity .15s; }
@@ -211,7 +211,8 @@ textarea::placeholder { color: var(--muted); opacity: 0.7; }
 .mirror .hit { background: rgba(232, 197, 131, 0.28); border-radius: 7px; box-shadow: 0 0 0 3px rgba(232, 197, 131, 0.28), 0 0 0 5px var(--accent); }
 /* A word outside toki pona gets a dashed red underline, except the one still being typed at the caret. */
 .mirror .plain:not(.typing) { text-decoration: underline; text-decoration-style: dashed; text-decoration-color: var(--danger); text-decoration-thickness: 2px; text-underline-offset: 4px; }
-/* The bubble: the glyph big, the word and its meaning beside it; a cartouche is wide, so it goes on top instead. */
+/* The bubble above the tapped glyph, placed by showTap: the glyph big, the word and its meaning beside it; a cartouche
+   is wide, so it goes on top instead. It is let through to the image, so a tap on it lands on the glyph under it. */
 .wpop { position: absolute; z-index: 6; display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 10px; align-items: center; background: var(--bg); color: var(--fg); border: var(--bw) solid var(--line); border-radius: 16px; padding: 8px 14px 8px 10px; max-width: 280px; pointer-events: none; opacity: 0; transition: opacity .12s; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18); }
 .wpop.show { opacity: 1; }
 .wpop.wide { grid-template-columns: minmax(0, 1fr); row-gap: 2px; max-width: 100%; }
@@ -511,7 +512,6 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
       <textarea id="text" autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="toki! mi jan Mali."></textarea>
       <div class="grip" id="grip" role="separator" aria-orientation="horizontal" aria-label="Box height: drag, or use the arrow keys" tabindex="0" aria-valuemin="104"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 9 9 21M21 16l-5 5"/></svg></div>
     </div>
-    <div class="wpop" id="wpop" aria-hidden="true"></div>
     <div class="unknown" id="unknown" hidden></div>
   </section>
 
@@ -519,6 +519,7 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
     <div class="stage" id="stage">
       <span class="lbl" aria-hidden="true">Preview</span>
       <span class="out-wrap"><img id="out" alt="Your message written in sitelen pona"><div class="out-ring" id="out-ring" aria-hidden="true"></div></span>
+      <div class="wpop" id="wpop" aria-hidden="true"></div>
       <button type="button" class="opts-btn" id="opts-btn" aria-label="Settings" title="Settings" aria-haspopup="dialog" aria-controls="opts"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 4h-7M10 4H3M21 12h-9M8 12H3M21 20h-5M12 20H3M14 2v4M8 10v4M16 18v4"/></svg></button>
       <div class="actions">
         <button class="primary" id="copy" type="button" aria-label="Copy image"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span class="copy-label">Copy<span class="copy-rest"> image</span></span></button>
@@ -1575,12 +1576,12 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
   })();
 
   // ---------- tap a glyph: which word is this? ----------
-  // A tap on a glyph in the preview rings the glyph, rings its word in the box, and shows a bubble over the word with the
-  // glyph, the word and its meaning. They stay until the next tap or an edit; a tap on the ringed glyph again, beside the
-  // glyphs or anywhere else on the page clears them. The same mirror underlines words outside toki pona in red. The
-  // segments know where they came from (parseLine) and where they landed (paint); the ring over the image scales from
-  // canvas pixels to the image as shown, and the mirror behind the box, one span per segment, places the word.
-  const mirrorEl = $("mirror"), popEl = $("wpop"), ringEl = $("out-ring"), fieldEl = textEl.closest(".field"), topbarEl = document.querySelector(".topbar");
+  // A tap on a glyph in the preview rings the glyph, rings its word in the box, and shows a bubble above the glyph with
+  // the glyph, the word and its meaning. They stay until the next tap or an edit; a tap on the ringed glyph again, beside
+  // the glyphs or anywhere else on the page clears them. The same mirror underlines words outside toki pona in red. The
+  // segments know where they came from (parseLine) and where they landed (paint); the ring and the bubble over the image
+  // scale from canvas pixels to the image as shown, and the mirror behind the box, one span per segment, places the word.
+  const mirrorEl = $("mirror"), popEl = $("wpop"), ringEl = $("out-ring"), stageEl = $("stage"), topbarEl = document.querySelector(".topbar");
   const MEANING = new Map(); // the bubble's gloss: the function sense first, then the everyday one
   for (const [, , words] of SHEET) for (const [w, m, alts] of words) {
     const add = (word, sense) => { const l = MEANING.get(word) || []; if (!l.includes(sense) && l.length < 2) MEANING.set(word, [...l, sense]); };
@@ -1600,7 +1601,7 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
 
   // The mirror follows the box's size (its corner can be dragged) and scroll.
   new ResizeObserver(() => { mirrorEl.style.width = textEl.offsetWidth + "px"; mirrorEl.style.height = textEl.offsetHeight + "px"; }).observe(textEl);
-  textEl.addEventListener("scroll", () => { mirrorEl.scrollTop = textEl.scrollTop; if (tapped) showTap(); });
+  textEl.addEventListener("scroll", () => { mirrorEl.scrollTop = textEl.scrollTop; });
   // The grip in the box's corner: a drag sets the box's height, between its minimum and most of the screen; the arrow
   // keys do the same when the grip has focus. Pointer capture keeps a touch drag going past the grip itself.
   {
@@ -1664,7 +1665,7 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
     const i = b ? segs.indexOf(b.seg) : -1;
     tapped = b && !(tapped && tapped.i === i) ? { i, text: textEl.value } : null;
     showTap();
-    // On a phone the box may have scrolled under the top bar: bring the bubble back into view.
+    // On a phone the glyph may sit just under the top bar: bring the bubble back into view.
     const top = popEl.getBoundingClientRect().top - topbarEl.offsetHeight - 8;
     if (tapped && top < 0) scrollBy({ top, behavior: "smooth" });
   });
@@ -1686,18 +1687,22 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
     Object.assign(ring.style, { left: (b.x - m) * k + "px", top: (b.y - m) * k + "px", width: (b.w + 2 * m) * k + "px", height: (b.h + 2 * m) * k + "px" });
     if (fresh) { void ring.offsetWidth; ring.style.transition = ""; }
     ring.classList.add("show");
-    // The bubble over the word: the glyph as the image draws it, and the word as it is drawn, or as typed for a name,
-    // a cartouche or plain letters. TRAIL would strip a cartouche's closing bracket, so that one is taken whole.
+    // The bubble: the glyph as the image draws it, and the word as it is drawn, or as typed for a name, a cartouche or
+    // plain letters. TRAIL would strip a cartouche's closing bracket, so that one is taken whole.
     const raw = textEl.value.slice(s.from, s.to), typed = s.t[0] === "[" || s.long ? raw : bare(raw.replace(LEAD, ""));
     popEl.replaceChildren(
       ...(s.glyph ? [el("span", { class: "wpop-glyph" }, s.t)] : []),
       el("span", { class: "wpop-word" }, s.glyph && !s.name && !s.long && s.t[0] !== "[" ? bare(s.t) || s.t : typed),
       el("span", { class: "wpop-meaning" }, gloss(s)));
     popEl.className = "wpop show" + (s.t[0] === "[" || s.long || !s.glyph ? " wide" : "");
-    const r = w.getClientRects()[0], f = fieldEl.getBoundingClientRect();
-    const cx = r.left + r.width / 2 - f.left, pw = popEl.offsetWidth;
-    popEl.style.left = Math.max(0, Math.min(cx - pw / 2, fieldEl.clientWidth - pw)) + "px";
-    popEl.style.top = r.top - f.top - popEl.offsetHeight - 6 + "px";
+    // It sits above the glyph's ring, centred on the glyph and kept just inside the sheet sideways. On the first line
+    // it rises past the sheet's top edge rather than dropping under the glyph, where it would cover the next line or
+    // the chips.
+    const r = outEl.getBoundingClientRect(), st = stageEl.getBoundingClientRect();
+    const ox = r.left + outEl.clientLeft - st.left - stageEl.clientLeft, oy = r.top + outEl.clientTop - st.top - stageEl.clientTop;
+    const cx = ox + (b.x + b.w / 2) * k, pw = popEl.offsetWidth;
+    popEl.style.left = Math.max(6, Math.min(cx - pw / 2, stageEl.clientWidth - 6 - pw)) + "px";
+    popEl.style.top = oy + (b.y - m) * k - popEl.offsetHeight - 6 + "px";
   }
 
   // ---------- offline, and updates ----------
