@@ -1576,9 +1576,9 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
   })();
 
   // ---------- tap a glyph: which word is this? ----------
-  // A tap on a glyph in the preview rings the glyph, rings its word in the box, and shows a bubble above the glyph with
-  // the glyph, the word and its meaning. They stay until the next tap or an edit; a tap on the ringed glyph again, beside
-  // the glyphs or anywhere else on the page clears them. The same mirror underlines words outside toki pona in red. The
+  // A tap on a glyph in the preview rings the glyph, rings its word in the box, scrolling the box to it, and shows a
+  // bubble above the glyph with the glyph, the word and its meaning. They stay until the next tap or an edit; a tap on
+  // the ringed glyph again, beside the glyphs or anywhere else on the page clears them. The same mirror underlines words outside toki pona in red. The
   // segments know where they came from (parseLine) and where they landed (paint); the ring and the bubble over the image
   // scale from canvas pixels to the image as shown, and the mirror behind the box, one span per segment, places the word.
   const mirrorEl = $("mirror"), popEl = $("wpop"), ringEl = $("out-ring"), stageEl = $("stage"), topbarEl = document.querySelector(".topbar");
@@ -1665,9 +1665,18 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
     const i = b ? segs.indexOf(b.seg) : -1;
     tapped = b && !(tapped && tapped.i === i) ? { i, text: textEl.value } : null;
     showTap();
-    // On a phone the glyph may sit just under the top bar: bring the bubble back into view.
+    if (!tapped) return;
+    // The box scrolls to the word when it is out of view, so its ring can be seen: the word lands just inside the box's
+    // padding, the way the first and last lines sit when the box is scrolled to either end. The mirror follows the
+    // scroll. On a phone the glyph may also sit just under the top bar: then the page scrolls to show the bubble.
+    const w = words[i];
+    if (w) {
+      const cs = getComputedStyle(textEl), lo = w.offsetTop - parseFloat(cs.paddingTop), hi = w.offsetTop + w.offsetHeight + parseFloat(cs.paddingBottom);
+      if (lo < textEl.scrollTop) textEl.scrollTo({ top: lo, behavior: "smooth" });
+      else if (hi > textEl.scrollTop + textEl.clientHeight) textEl.scrollTo({ top: hi - textEl.clientHeight, behavior: "smooth" });
+    }
     const top = popEl.getBoundingClientRect().top - topbarEl.offsetHeight - 8;
-    if (tapped && top < 0) scrollBy({ top, behavior: "smooth" });
+    if (top < 0) scrollBy({ top, behavior: "smooth" });
   });
   const clearTap = () => { if (tapped) { tapped = null; showTap(); } };
   textEl.addEventListener("input", clearTap);
