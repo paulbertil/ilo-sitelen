@@ -1308,7 +1308,12 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
     recvBtn.setAttribute("aria-expanded", String(show));
     if (show) pasteEl.focus();
   }
+  // Tapping Import again closes the field. The button must not take focus, or the blur below would close the field
+  // first and the click would open it again.
+  recvBtn.addEventListener("pointerdown", (e) => e.preventDefault());
   recvBtn.addEventListener("click", () => showPaste(pasteEl.hidden));
+  // The field is a one-shot action: tap away and it goes, so an empty pill is not left behind.
+  pasteEl.addEventListener("blur", () => { if (!pasteEl.hidden) showPaste(false); });
   pasteEl.addEventListener("input", async () => {
     const payload = payloadOf(pasteEl.value);
     if (!payload) { if (pasteEl.value.trim().length > 20) toast("That isn't a Recents link."); return; }
