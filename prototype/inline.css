@@ -19,8 +19,8 @@ html[data-variant] #mirror { display: none; }
 /* A glyph is the word itself in the sitelen pona font: the letters stay in the page, the font draws them as one glyph. */
 .ed .g { font-family: "NasinNanpa"; font-size: var(--gs); font-weight: 400; line-height: 1; vertical-align: middle; margin-inline: 2px; border-radius: 8px; }
 /* A word the box draws differently from how it is typed (a name, a long glyph): letters hidden, the drawing beside them. */
-.ed .rep { font-size: 0; margin: 0; vertical-align: 4.5px; }
-.ed .rep::before { content: attr(data-g); font: 400 var(--gs)/1 "NasinNanpa"; vertical-align: middle; margin-inline: 2px; }
+.ed .rep::before { content: attr(data-g); }
+.ed .rep .src { display: inline-block; width: 0; height: 0; overflow: hidden; white-space: pre; }
 .ed .w { font-size: 1.15rem; }
 .ed .bad:not(.typing):not(.cur) { text-decoration: underline dashed var(--danger) 2px; text-underline-offset: 4px; }
 

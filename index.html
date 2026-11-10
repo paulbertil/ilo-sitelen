@@ -1713,7 +1713,7 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
   // The message and settings live in localStorage, so the reload keeps them.
   // PROTOTYPE: the merged box lives in prototype/inline.js and gets what it needs from here. No service worker meanwhile.
   if (document.documentElement.dataset.variant) {
-    window.__proto = { parseLine, state, textEl, SENTENCE_END, syncTheme, gloss, bare };
+    window.__proto = { parseLine, state, textEl, SENTENCE_END, syncTheme, gloss, bare, WORDS };
     document.head.append(el("link", { rel: "stylesheet", href: "prototype/inline.css" }));
     document.body.append(el("script", { src: "prototype/inline.js" }));
   }

@@ -7,7 +7,7 @@
 // from it. The hidden textarea stays the app's source of truth, so Copy, Recents and the cheat sheet work unchanged.
 (() => {
   "use strict";
-  const { parseLine, state, textEl, SENTENCE_END, syncTheme, gloss, bare } = window.__proto;
+  const { parseLine, state, textEl, SENTENCE_END, syncTheme, gloss, bare, WORDS } = window.__proto;
   const root = document.documentElement;
   const VARIANTS = { a: "Word at the caret", b: "Instant + letter bubble", c: "Letters under glyphs", d: "Sentence at the caret" };
   let variant = VARIANTS[root.dataset.variant] ? root.dataset.variant : "a";
@@ -94,7 +94,10 @@
         const rep = src !== s.t; // a name, a long glyph, a dropped comma: drawn differently from how it is typed
         const open = variant === "a" ? cur : variant === "d" ? s.group === g : rep && cur;
         if (open) span.className = "w open" + (cur ? " cur" : "");
-        else if (rep) { span.className = "g rep"; span.dataset.g = s.t; }
+        else if (rep) { // the letters go into a zero-size child, so they take no room in any browser
+          span.className = "g rep"; span.dataset.g = s.t;
+          const src = mk("span", "src"); src.textContent = span.textContent; span.replaceChildren(src);
+        }
         else span.className = "g" + (cur ? " cur" : "");
       }
       frag.append(span);
@@ -150,12 +153,25 @@
     const typed = text.slice(s.from, s.to), part = (cls, t) => { const n = mk("span", cls); n.textContent = t; return n; };
     tip.replaceChildren(
       ...(s.glyph ? [part("wpop-glyph", s.t)] : []),
-      part("wpop-word", s.glyph && !s.name && !s.long && s.t[0] !== "[" ? bare(s.t) || s.t : typed),
+      part("wpop-word", s.glyph && !s.name && !s.long && s.t[0] !== "[" ? bare(s.t) || s.t : s.t[0] === "[" && !s.name ? spaced(s.t) : typed),
       part("wpop-meaning", gloss(s)));
     tip.className = "wpop show" + (s.t[0] === "[" || s.long || !s.glyph ? " wide" : "");
     const sh = host.getBoundingClientRect(), pw = tip.offsetWidth;
     tip.style.left = Math.max(6, Math.min(r.left + r.width / 2 - sh.left - pw / 2, host.clientWidth - 6 - pw)) + "px";
     tip.style.top = r.top - sh.top - tip.offsetHeight - 8 + "px";
+  }
+  // A cartouche typed without spaces, [pilinesun], is shown in the bubble word by word, [pilin esun]: the longest word
+  // at each place, as the font reads it, with its number and syllable ticks kept on it.
+  function spaced(t) {
+    const inner = t.replace(/^\[|\].*$/g, ""), out = [];
+    for (let i = 0; i < inner.length;) {
+      let n = Math.min(16, inner.length - i);
+      while (n > 0 && !WORDS.has(inner.slice(i, i + n))) n--;
+      const m = /^[1-8]?,*/.exec(inner.slice(i + n))[0].length;
+      if (n) out.push(inner.slice(i, i + n + m)); else if (out.length) out[out.length - 1] += inner[i]; else out.push(inner[i]);
+      i += n ? n + m : 1;
+    }
+    return "[" + out.join(" ") + "]" + t.replace(/^[^\]]*\]?/, "");
   }
   function setTap(from) { tapped = from; placePop(); }
   // Read at pointerdown and acted on at pointerup (below): the box is redrawn around the caret in between, the pressed
