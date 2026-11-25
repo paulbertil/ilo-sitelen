@@ -1135,7 +1135,7 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
         foldCards();
       } });
       const win = el("div", { class: "card-win" },
-        el("div", { class: "card-clip" }, el("button", { class: "card-img", type: "button", "aria-label": "Open: " + firstLine(r.text), onclick: () => leaveNote(() => openRecent(r)) }, el("img", { src: th.url, alt: "" }))),
+        el("div", { class: "card-clip" }, el("button", { class: "card-img", type: "button", "aria-label": "Open: " + firstLine(r.text), onclick: () => leaveNote(() => openRecent(r), r) }, el("img", { src: th.url, alt: "" }))),
         more);
       const card = el("article", { class: "card" }, win, meta);
       cards.push([card, r, th, more]);
@@ -1182,24 +1182,34 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
   // The note in the box is not in Recents: typed and never sent, or opened from Recents and then changed. Opening
   // another note or starting a new one would drop it, so those two ask first. Save puts it in Recents as it is now,
   // Don't save lets it go, and Escape or a tap on the scrim leaves everything as it was.
+  // A note just removed from Recents with its trash can is not asked about: removing it was the answer.
   const askEl = $("ask");
-  let askThen = null;
-  const unsaved = () => { const cur = textEl.value.trim(); return !!cur && !recents.some((r) => r.text === cur); };
-  function leaveNote(then) {
-    if (!unsaved()) return then();
-    askThen = then; askEl.showModal();
+  let askThen = null, askFor = null; // what to do after the answer, and the note being opened, if any
+  let letGo = null; // text of the note last removed from Recents
+  const inDialog = () => askEl.open || optsEl.open; // Escape then belongs to the dialog, not to the shelf or the sheet
+  const unsaved = () => { const cur = textEl.value.trim(); return !!cur && cur !== letGo && !recents.some((r) => r.text.trim() === cur); };
+  function leaveNote(then, r) {
+    // A browser without modal dialogs opens the note at once, as before.
+    if (!unsaved() || typeof askEl.showModal !== "function") return then();
+    askThen = then; askFor = r || null; askEl.showModal();
   }
   function answer(save) {
-    const then = askThen;
+    const then = askThen, r = askFor;
     askEl.close();
     if (!then) return;
-    if (save) recordRecent();
+    if (save) {
+      recordRecent();
+      // A full list drops its oldest note to make room. When that is the note being opened, the one before it goes instead.
+      if (r && !recents.includes(r)) { recents[recents.length - 1] = r; saveRecents(); renderShelf(); }
+    }
     then();
+    // Saving drew the cards again, so the tapped one is gone: focus goes to the card of the note now open.
+    if (save && r && shelfOpen) shelfList.querySelector(".card.active .card-img")?.focus();
   }
   $("ask-save").addEventListener("click", () => answer(true));
   $("ask-drop").addEventListener("click", () => answer(false));
   askEl.addEventListener("click", (e) => { if (e.target === askEl) askEl.close(); });
-  askEl.addEventListener("close", () => { askThen = null; });
+  askEl.addEventListener("close", () => { askThen = askFor = null; });
 
   function openRecent(r) {
     const o = settingsOf(r);
@@ -1215,7 +1225,7 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
   function deleteRecent(r) {
     const i = recents.findIndex((x) => x.text === r.text);
     if (i >= 0) recents.splice(i, 1);
-    pendingDelete = null;
+    pendingDelete = null; letGo = r.text.trim();
     saveRecents(); renderShelf();
     toast("Removed from Recents.");
   }
@@ -1258,7 +1268,7 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
   $("s-close").addEventListener("click", () => { setShelf(false); recentsBtn.focus(); });
   $("s-new").addEventListener("click", () => leaveNote(newMessage));
   scrimEl.addEventListener("click", () => setShelf(false));
-  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && shelfOpen && !wide.matches) { setShelf(false); recentsBtn.focus(); } });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && shelfOpen && !wide.matches && !inDialog()) { setShelf(false); recentsBtn.focus(); } });
   wide.addEventListener("change", () => { setShelf(wantsShelf()); syncSheetMode(); });
   roomy.addEventListener("change", syncShelf);
   if (iOS && !standalone) $("s-foot-text").textContent = "Saved on this phone only. They last longest when the app is on your Home Screen.";
@@ -1568,7 +1578,7 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
   bookBtn.addEventListener("click", () => setSheet(!sheetOpen));
   $("sheet-done").addEventListener("click", () => setSheet(false));
   sheetScrim.addEventListener("click", () => setSheet(false));
-  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && sheetOpen) { e.preventDefault(); setSheet(false); } });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && sheetOpen && !inDialog()) { e.preventDefault(); setSheet(false); } });
   recentsBtn.addEventListener("click", () => { if (sheetOpen && wide.matches && !roomy.matches) setSheet(false); });
   new MutationObserver(() => { if (sheetOpen) sheetImg.src = outEl.src; }).observe(outEl, { attributes: true, attributeFilter: ["src"] });
   sheetImg.addEventListener("load", () => { sheetPreview.scrollLeft = sheetPreview.scrollWidth; });
