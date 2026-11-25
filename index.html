@@ -258,6 +258,12 @@ button:active, .btn:active { transform: scale(0.98); }
 .opts-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .opts-bar h2 { margin: 0; flex: 1; font: 700 1.15rem/1 var(--font); }
 .opts-bar .btn { padding: 8px 14px; font-size: 0.9rem; }
+/* The question before a note that is not in Recents is swapped for another: the same card, with two answers. */
+.ask-card { display: grid; gap: 6px; padding: 18px 16px 16px; }
+.ask-card h2 { margin: 0; font: 700 1.15rem/1.2 var(--font); }
+.ask-card p { margin: 0; color: var(--muted); font-size: 0.9rem; }
+.ask-acts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.ask-acts button { padding: 10px 16px; font-size: 0.9rem; }
 /* A row: the glyph at the left across both lines of text, the name over the help, and the switch at the right. Size and
    Colors put their control on a third line across the row. A Names or Lines row is a label, so a tap anywhere flips it. */
 .setting {
@@ -611,6 +617,16 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
     <span class="setting-help">Start a new line after each sentence</span>
     <input type="checkbox" class="switch" id="sentences" checked>
   </label>
+</div>
+</dialog>
+<dialog class="opts" id="ask" aria-labelledby="ask-title" aria-describedby="ask-text">
+<div class="ask-card">
+  <h2 id="ask-title">Save this note first?</h2>
+  <p id="ask-text">It isn't in Recents yet.</p>
+  <div class="ask-acts">
+    <button type="button" class="primary" id="ask-save">Save</button>
+    <button type="button" id="ask-drop">Don't save</button>
+  </div>
 </div>
 </dialog>
 <div class="scrim" id="scrim" hidden></div>
@@ -1119,7 +1135,7 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
         foldCards();
       } });
       const win = el("div", { class: "card-win" },
-        el("div", { class: "card-clip" }, el("button", { class: "card-img", type: "button", "aria-label": "Open: " + firstLine(r.text), onclick: () => openRecent(r) }, el("img", { src: th.url, alt: "" }))),
+        el("div", { class: "card-clip" }, el("button", { class: "card-img", type: "button", "aria-label": "Open: " + firstLine(r.text), onclick: () => leaveNote(() => openRecent(r)) }, el("img", { src: th.url, alt: "" }))),
         more);
       const card = el("article", { class: "card" }, win, meta);
       cards.push([card, r, th, more]);
@@ -1162,6 +1178,28 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
     const cur = textEl.value.trim();
     for (const [card, r] of cards) card.classList.toggle("active", r.text === cur);
   }
+
+  // The note in the box is not in Recents: typed and never sent, or opened from Recents and then changed. Opening
+  // another note or starting a new one would drop it, so those two ask first. Save puts it in Recents as it is now,
+  // Don't save lets it go, and Escape or a tap on the scrim leaves everything as it was.
+  const askEl = $("ask");
+  let askThen = null;
+  const unsaved = () => { const cur = textEl.value.trim(); return !!cur && !recents.some((r) => r.text === cur); };
+  function leaveNote(then) {
+    if (!unsaved()) return then();
+    askThen = then; askEl.showModal();
+  }
+  function answer(save) {
+    const then = askThen;
+    askEl.close();
+    if (!then) return;
+    if (save) recordRecent();
+    then();
+  }
+  $("ask-save").addEventListener("click", () => answer(true));
+  $("ask-drop").addEventListener("click", () => answer(false));
+  askEl.addEventListener("click", (e) => { if (e.target === askEl) askEl.close(); });
+  askEl.addEventListener("close", () => { askThen = null; });
 
   function openRecent(r) {
     const o = settingsOf(r);
@@ -1218,7 +1256,7 @@ button.wt:hover { background: color-mix(in srgb, var(--accent) 40%, transparent)
   const syncShelf = () => { if (wide.matches && shelfOpen !== wantsShelf()) setShelf(wantsShelf()); };
   recentsBtn.addEventListener("click", () => { setShelf(true); if (!wide.matches) $("s-close").focus(); });
   $("s-close").addEventListener("click", () => { setShelf(false); recentsBtn.focus(); });
-  $("s-new").addEventListener("click", newMessage);
+  $("s-new").addEventListener("click", () => leaveNote(newMessage));
   scrimEl.addEventListener("click", () => setShelf(false));
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && shelfOpen && !wide.matches) { setShelf(false); recentsBtn.focus(); } });
   wide.addEventListener("change", () => { setShelf(wantsShelf()); syncSheetMode(); });
